@@ -1,13 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seed } from './data/db';
+import { Config } from './ui/Config';
 import { Curriculum } from './ui/Curriculum';
+import { Groups } from './ui/Groups';
+import { Planner } from './ui/Planner';
 import { Settings } from './ui/Settings';
-import { Summary } from './ui/Summary';
+
+const TABS = [
+  ['groups', 'Grupos'],
+  ['plan', 'Planificador'],
+  ['curr', 'Currículo'],
+  ['config', 'Configuración'],
+  ['conn', 'Conexión'],
+] as const;
+type Tab = (typeof TABS)[number][0];
 
 export function App() {
-  const [tab, setTab] = useState<'curr' | 'ajustes'>('curr');
-  const [sid, setSid] = useState<string>('');
+  const [tab, setTab] = useState<Tab>('groups');
+  const [sid, setSid] = useState('');
   const subjects = useLiveQuery(() => db.subjects.toArray());
 
   useEffect(() => {
@@ -24,16 +35,15 @@ export function App() {
         <select value={subject?.id ?? ''} onChange={(e) => setSid(e.target.value)}>
           {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <button className={tab === 'curr' ? 'on' : ''} onClick={() => setTab('curr')}>Currículo</button>
-        <button className={tab === 'ajustes' ? 'on' : ''} onClick={() => setTab('ajustes')}>Ajustes</button>
       </div>
-      {tab === 'ajustes' && <Settings />}
-      {tab === 'curr' && subject && (
-        <>
-          <Summary subject={subject} />
-          <Curriculum key={subject.id} subject={subject} />
-        </>
-      )}
+      <div className="tabs">
+        {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
+      </div>
+      {tab === 'conn' && <Settings />}
+      {subject && tab === 'groups' && <Groups key={subject.id} subject={subject} />}
+      {subject && tab === 'plan' && <Planner key={subject.id} subject={subject} />}
+      {subject && tab === 'curr' && <Curriculum key={subject.id} subject={subject} />}
+      {subject && tab === 'config' && <Config key={subject.id} subject={subject} />}
     </div>
   );
 }

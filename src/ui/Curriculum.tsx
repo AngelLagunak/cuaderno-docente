@@ -1,46 +1,74 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, setLink } from '../data/db';
+import { db, deleteNode, saveNode, setLink, uid } from '../data/db';
 import { review } from '../core/curriculum';
+import { useNodes } from './hooks';
 import type { CNode, RelationDef, Subject } from '../core/model';
 
+function NodeForm(p: { node: CNode; showGroup: boolean; onSave: (n: CNode) => void; onCancel: () => void }) {
+  const [code, setCode] = useState(p.node.code);
+  const [title, setTitle] = useState(p.node.title);
+  const [tags, setTags] = useState(p.node.tags.join(', '));
+  const [group, setGroup] = useState(p.node.group ?? '');
+  return (
+    <div className="form">
+      <input placeholder="Código" value={code} onChange={(e) => setCode(e.target.value)} />
+      <textarea rows={3} placeholder="Texto" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <input placeholder="Etiquetas (separadas por comas)" value={tags} onChange={(e) => setTags(e.target.value)} />
+      {p.showGroup && (
+        <input placeholder="Grupo para el radar (CCL, STEM, CD…)" value={group} onChange={(e) => setGroup(e.target.value)} />
+      )}
+      <div className="row">
+        <button
+          className="on"
+          disabled={!code.trim() || !title.trim()}
+          onClick={() =>
+            p.onSave({
+              ...p.node,
+              code: code.trim(),
+              title: title.trim(),
+              tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+              group: group.trim() || undefined,
+            })
+          }
+        >
+          Guardar
+        </button>
+        <button onClick={p.onCancel}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 export function Curriculum({ subject }: { subject: Subject }) {
-  const allNodes = useLiveQuery(() => db.nodes.where('subjectId').equals(subject.id).sortBy('order'), [subject.id]);
+  const nodes = useNodes(subject.id);
   const allLinks = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
-  const nodes = useMemo(() => (allNodes ?? []).filter((n) => !n.deleted), [allNodes]);
   const links = useMemo(() => (allLinks ?? []).filter((l) => !l.deleted), [allLinks]);
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
-  const [levelKey, setLevelKey] = useState(subject.levels[0].key);
+  const [levelKey, setLevelKey] = useState(subject.levels[0]?.key ?? '');
   const [view, setView] = useState<'cards' | 'review'>('cards');
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [adding, setAdding] = useState<CNode | null>(null);
 
   const lv = subject.levels.find((l) => l.key === levelKey) ?? subject.levels[0];
-  const rels = subject.relations.filter((r) => r.from === lv.key || r.to === lv.key);
-  const levelOf = (k: string) => subject.levels.find((l) => l.key === k)!;
   const issues = useMemo(() => review(subject, nodes, links), [subject, nodes, links]);
+  if (!lv) return <div className="card">Esta materia no tiene niveles. Defínelos en Configuración.</div>;
 
-  if (subject.relations.length === 0)
-    return (
-      <div className="card">
-        <p><b>{subject.name}</b> no usa vínculos curriculares.</p>
-        <p className="mute">
-          Las actividades se evalúan por instrumento. Los {nodes.length} aspectos evaluables
-          ({subject.levels[0].plural.toLowerCase()}) quedan disponibles para asociarlos a una actividad si quieres.
-        </p>
-        {nodes.map((n) => (
-          <div className="issue" key={n.id}>
-            <b>{n.code}</b>
-            <span>{n.title}</span>
-          </div>
-        ))}
-      </div>
-    );
-
+  const rels = subject.relations.filter((r) => r.from === lv.key || r.to === lv.key);
+  const levelOf = (k: string) => subject.levels.find((l) => l.key === k);
+  const showGroup = lv.key === 'desc' || nodes.some((n) => n.level === lv.key && n.group);
   const shown = nodes.filter(
     (n) => n.level === lv.key && (!q || (n.code + ' ' + n.title).toLowerCase().includes(q.toLowerCase()))
   );
+
+  const startAdd = () =>
+    setAdding({
+      id: uid(), subjectId: subject.id, level: lv.key, code: '', title: '',
+      order: nodes.reduce((m, n) => Math.max(m, n.order), 0) + 1, tags: [], updatedAt: Date.now(),
+    });
 
   const cardGroup = (n: CNode, r: RelationDef) => {
     const side = r.from === lv.key ? 'from' : 'to';
@@ -49,12 +77,11 @@ export function Curriculum({ subject }: { subject: Subject }) {
     const ids = new Set(mine.map((l) => (side === 'from' ? l.toId : l.fromId)));
     const linked = [...ids].map((id) => byId.get(id)).filter((x): x is CNode => !!x).sort((a, b) => a.order - b.order);
     const pk = `${n.id}|${r.key}`;
-    const candidates = nodes.filter((x) => x.level === otherKey);
-    const toggle = (other: CNode, on: boolean) =>
-      setLink(subject.id, r.key, side === 'from' ? n.id : other.id, side === 'from' ? other.id : n.id, on);
+    const toggle = (o: CNode, on: boolean) =>
+      setLink(subject.id, r.key, side === 'from' ? n.id : o.id, side === 'from' ? o.id : n.id, on);
     return (
       <div className="group" key={r.key}>
-        <b>{levelOf(otherKey).plural}</b>
+        <b>{levelOf(otherKey)?.plural ?? otherKey}</b>
         <div className="chips">
           {linked.map((o) => (
             <span className="chip" key={o.id} title={o.title}>
@@ -68,7 +95,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
         </div>
         {open === pk && (
           <div className="picker">
-            {candidates.map((o) => (
+            {nodes.filter((x) => x.level === otherKey).map((o) => (
               <label key={o.id}>
                 <input type="checkbox" checked={ids.has(o.id)} onChange={(e) => toggle(o, e.target.checked)} />
                 <span><b>{o.code}</b> {o.title}</span>
@@ -83,7 +110,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row">
-        <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>Tarjetas</button>
+        <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>Elementos</button>
         <button className={view === 'review' ? 'on' : ''} onClick={() => setView('review')}>
           Revisión{issues.length ? ` (${issues.length})` : ''}
         </button>
@@ -91,7 +118,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
 
       {view === 'review' ? (
         <div className="card">
-          {issues.length === 0 && <p>Sin avisos. Todos los enlaces obligatorios están hechos.</p>}
+          {issues.length === 0 && <p>Sin avisos.</p>}
           {issues.map((i) => {
             const n = byId.get(i.nodeId);
             return (
@@ -105,20 +132,40 @@ export function Curriculum({ subject }: { subject: Subject }) {
       ) : (
         <>
           <div className="row">
-            <select value={lv.key} onChange={(e) => { setLevelKey(e.target.value); setOpen(null); }}>
+            <select value={lv.key} onChange={(e) => { setLevelKey(e.target.value); setOpen(null); setEditing(null); setAdding(null); }}>
               {subject.levels.map((l) => <option key={l.key} value={l.key}>{l.plural}</option>)}
             </select>
             <input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
-            <span className="mute">{shown.length} elementos</span>
+            <button onClick={startAdd}>+ {lv.label}</button>
           </div>
+          {rels.length === 0 && <p className="mute">Sin vínculos para este nivel (se definen en Configuración → Estructura).</p>}
+          {adding && (
+            <div className="card">
+              <NodeForm node={adding} showGroup={showGroup} onCancel={() => setAdding(null)}
+                onSave={async (n) => { await saveNode(n); setAdding(null); }} />
+            </div>
+          )}
           {shown.map((n) => (
             <div className="card" key={n.id}>
-              <div>
-                <b>{n.code}</b> {n.tags.map((t) => <span className="tag" key={t}>{t}</span>)}
-                {n.group && <span className="tag">{n.group}</span>}
-              </div>
-              <p>{n.title}</p>
-              {rels.map((r) => cardGroup(n, r))}
+              {editing === n.id ? (
+                <NodeForm node={n} showGroup={showGroup} onCancel={() => setEditing(null)}
+                  onSave={async (x) => { await saveNode(x); setEditing(null); }} />
+              ) : (
+                <>
+                  <div className="sp">
+                    <div>
+                      <b>{n.code}</b> {n.tags.map((t) => <span className="tag" key={t}>{t}</span>)}
+                      {n.group && <span className="tag">{n.group}</span>}
+                    </div>
+                    <div className="row" style={{ margin: 0 }}>
+                      <button className="small" onClick={() => setEditing(n.id)}>Editar</button>
+                      <button className="small" onClick={() => { if (confirm(`¿Borrar ${n.code}? Se quitará de vínculos, unidades y actividades.`)) deleteNode(n); }}>Borrar</button>
+                    </div>
+                  </div>
+                  <p>{n.title}</p>
+                  {rels.map((r) => cardGroup(n, r))}
+                </>
+              )}
             </div>
           ))}
         </>

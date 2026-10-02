@@ -1,0 +1,30 @@
+:root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#667085; --line:#d8dce3; --brand:#2d4a7a; --chip:#e8edf6; --warn:#b54708; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#14171d; --card:#1d222b; --ink:#e8eaee; --mute:#98a2b3; --line:#323945; --brand:#8fb0e8; --chip:#2a3342; --warn:#f79009; }
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font-family: system-ui, sans-serif; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 12px; }
+h1 { font-size: 1.3rem; margin: 4px 0 8px; }
+select, input, button { font: inherit; padding: 8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); }
+button { cursor:pointer; }
+button.on { background:var(--brand); color:var(--bg); border-color:var(--brand); }
+.row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+.mute { color:var(--mute); font-size:.85rem; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; margin:10px 0; }
+.card p { margin:4px 0 8px; }
+.tag { display:inline-block; font-size:.7rem; border:1px solid var(--line); border-radius:6px; padding:1px 6px; margin-right:4px; color:var(--mute); }
+.group { margin-top:8px; }
+.group > b { font-size:.8rem; color:var(--mute); }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.chip { background:var(--chip); border-radius:999px; padding:3px 6px 3px 10px; font-size:.82rem; display:inline-flex; gap:4px; align-items:center; border:0; }
+.chip button { border:0; background:none; padding:0 4px; color:var(--mute); }
+.chip.add { padding:3px 10px; color:var(--brand); }
+.picker { border:1px solid var(--line); border-radius:8px; margin-top:6px; max-height:260px; overflow:auto; padding:6px; }
+.picker label { display:flex; gap:8px; padding:5px 2px; font-size:.88rem; align-items:flex-start; }
+.picker input[type=checkbox] { width:auto; margin-top:3px; }
+.issue { display:flex; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); font-size:.9rem; }
+.issue b { min-width: 64px; }
+.warn { color:var(--warn); }
+pre { background:var(--chip); padding:12px; white-space:pre-wrap; border-radius:8px; }
+input.full { display:block; width:100%; margin:4px 0 12px; }

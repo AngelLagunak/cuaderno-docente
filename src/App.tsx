@@ -1,53 +1,39 @@
 import { useEffect, useState } from 'react';
-
-const get = (k: string) => localStorage.getItem(k) ?? '';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, seed } from './data/db';
+import { Curriculum } from './ui/Curriculum';
+import { Settings } from './ui/Settings';
+import { Summary } from './ui/Summary';
 
 export function App() {
-  const [url, setUrl] = useState(get('scriptUrl'));
-  const [token, setToken] = useState(get('scriptToken'));
-  const [online, setOnline] = useState(navigator.onLine);
-  const [result, setResult] = useState('');
+  const [tab, setTab] = useState<'curr' | 'ajustes'>('curr');
+  const [sid, setSid] = useState<string>('');
+  const subjects = useLiveQuery(() => db.subjects.toArray());
 
   useEffect(() => {
-    const on = () => setOnline(true);
-    const off = () => setOnline(false);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => {
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-    };
+    navigator.storage?.persist?.();
+    seed().catch(console.error);
   }, []);
 
-  async function ping() {
-    localStorage.setItem('scriptUrl', url.trim());
-    localStorage.setItem('scriptToken', token.trim());
-    setResult('Conectando…');
-    try {
-      const r = await fetch(url.trim(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'ping', token: token.trim() })
-      });
-      setResult(JSON.stringify(await r.json(), null, 2));
-    } catch (e) {
-      setResult('Error: ' + String(e));
-    }
-  }
+  const subject = subjects?.find((s) => s.id === sid) ?? subjects?.[0];
 
-  const box = { display: 'block', width: '100%', padding: 8, margin: '4px 0 12px', boxSizing: 'border-box' as const };
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', maxWidth: 560, margin: '0 auto', padding: 16 }}>
+    <div className="wrap">
       <h1>Cuaderno docente</h1>
-      <p>Fase 0 · Estado: {online ? '🟢 con conexión' : '🔴 sin conexión'}</p>
-      <label>URL del Apps Script
-        <input style={box} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec" />
-      </label>
-      <label>Token
-        <input style={box} type="password" value={token} onChange={(e) => setToken(e.target.value)} />
-      </label>
-      <button onClick={ping} style={{ padding: '10px 16px' }}>Probar conexión</button>
-      <pre style={{ background: '#f2f2f2', padding: 12, whiteSpace: 'pre-wrap' }}>{result}</pre>
+      <div className="row">
+        <select value={subject?.id ?? ''} onChange={(e) => setSid(e.target.value)}>
+          {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <button className={tab === 'curr' ? 'on' : ''} onClick={() => setTab('curr')}>Currículo</button>
+        <button className={tab === 'ajustes' ? 'on' : ''} onClick={() => setTab('ajustes')}>Ajustes</button>
+      </div>
+      {tab === 'ajustes' && <Settings />}
+      {tab === 'curr' && subject && (
+        <>
+          <Summary subject={subject} />
+          <Curriculum key={subject.id} subject={subject} />
+        </>
+      )}
     </div>
   );
 }

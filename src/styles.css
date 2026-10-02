@@ -28,3 +28,11 @@ button.on { background:var(--brand); color:var(--bg); border-color:var(--brand);
 .warn { color:var(--warn); }
 pre { background:var(--chip); padding:12px; white-space:pre-wrap; border-radius:8px; }
 input.full { display:block; width:100%; margin:4px 0 12px; }
+textarea { font: inherit; width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); }
+.form { display:grid; gap:8px; margin:6px 0; }
+.sp { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+.small { padding:4px 10px; font-size:.82rem; }
+.grid2 { display:grid; grid-template-columns: 1fr 90px 40px; gap:6px; margin:4px 0; align-items:center; }
+.tabs { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
+h3 { margin:16px 0 4px; font-size:1rem; }
+.num { width:90px; }

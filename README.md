@@ -30,7 +30,8 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - Modelado y Maquetismo: 3 instrumentos (60/30/10), sin criterios ni competencias. Sus puntos son "aspectos" evaluables.
 - Currículo por unidades didácticas: no se precarga. Las programas tú en la app.
 
-## Fase 1 (currículo)
-- Pestaña **Currículo**: vínculos por tarjetas (+ Vincular) y panel **Revisión**. Vincular es opcional: sin vínculos, el cuaderno funciona solo con instrumentos.
-- Proyectos Artísticos viene precargado (5 CE, 15 criterios, 29 indicadores, 24 descriptores, 8 saberes). Modelado y Maquetismo II: 15 aspectos evaluables sin vínculos.
-- Si cambias el catálogo, borra los datos del sitio en el navegador para recargarlo (aún no hay versionado).
+## Fase 1-2
+- **Configuración**: instrumentos, evaluaciones (pesos editables), cálculo y estructura curricular (niveles y relaciones), igual en todas las materias.
+- **Currículo**: añadir, editar y borrar elementos; vincular es opcional.
+- **Grupos**: alumnos por pegado o CSV (Apellidos, Nombre, correo, NIA).
+- **Planificador**: unidades, actividades (instrumento, evaluación, peso, criterios opcionales) y cobertura.

@@ -84,6 +84,7 @@ export interface Activity extends Stamp {
   title: string;
   weight: number;
   nodeIds: ID[];
+  unitId?: ID;
   date?: string;
 }
 
@@ -94,4 +95,15 @@ export interface Grade extends Stamp {
   value: number | null;
   late?: boolean;
   comment?: string;
+}
+
+/** Unidad didáctica: la programa el docente (no se precarga). */
+export interface LearningUnit extends Stamp {
+  id: ID;
+  subjectId: ID;
+  code: string;
+  title: string;
+  termId: ID;
+  plannedSessions: number;
+  nodeIds: ID[];
 }

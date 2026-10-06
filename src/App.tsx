@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seed } from './data/db';
+import { Attendance } from './ui/Attendance';
 import { Config } from './ui/Config';
 import { Curriculum } from './ui/Curriculum';
 import { Groups } from './ui/Groups';
@@ -10,6 +11,7 @@ import { Settings } from './ui/Settings';
 
 const TABS = [
   ['notes', 'Cuaderno'],
+  ['att', 'Asistencia'],
   ['groups', 'Grupos'],
   ['plan', 'Planificador'],
   ['curr', 'Currículo'],
@@ -43,6 +45,7 @@ export function App() {
       </div>
       {tab === 'conn' && <Settings />}
       {subject && tab === 'notes' && <Notebook key={subject.id} subject={subject} />}
+      {subject && tab === 'att' && <Attendance key={subject.id} subject={subject} />}
       {subject && tab === 'groups' && <Groups key={subject.id} subject={subject} />}
       {subject && tab === 'plan' && <Planner key={subject.id} subject={subject} />}
       {subject && tab === 'curr' && <Curriculum key={subject.id} subject={subject} />}

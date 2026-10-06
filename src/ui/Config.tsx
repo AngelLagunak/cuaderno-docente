@@ -86,6 +86,8 @@ export function Config({ subject }: { subject: Subject }) {
         <label>Decimales en la nota final <input className="num" type="number" min={0} max={3} value={d.config.finalDecimals} onChange={(e) => cfg({ finalDecimals: num(e.target.value) })} /></label>
         <label><input type="checkbox" style={{ width: 'auto' }} checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Cada instrumento debe llegar al aprobado</label>
         <label>Penalización por entrega tardía (%) <input className="num" type="number" min={0} max={100} value={d.config.latePenaltyPct} onChange={(e) => cfg({ latePenaltyPct: num(e.target.value) })} /></label>
+        <label>Aviso de faltas injustificadas (%) <input className="num" type="number" min={0} max={100} value={d.config.absenceWarnPct ?? 20} onChange={(e) => cfg({ absenceWarnPct: num(e.target.value, 20) })} /></label>
+        <label>Sesiones anuales previstas (0 = las pasadas lista) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>
       </div>
 
       <h3>Estructura curricular</h3>

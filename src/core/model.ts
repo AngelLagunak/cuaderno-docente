@@ -34,6 +34,10 @@ export interface SubjectConfig {
   minPerInstrument: boolean;
   /** % de penalización por entrega tardía (0 = no se usa). */
   latePenaltyPct: number;
+  /** % de faltas injustificadas que activa el aviso (por defecto 20). */
+  absenceWarnPct?: number;
+  /** Sesiones anuales previstas; 0 o vacío = usar las sesiones pasadas lista. */
+  annualSessions?: number;
 }
 
 export interface Subject extends Stamp {
@@ -106,4 +110,17 @@ export interface LearningUnit extends Stamp {
   termId: ID;
   plannedSessions: number;
   nodeIds: ID[];
+}
+
+export type AttStatus = 'P' | 'A' | 'R' | 'J';
+
+/** Una fila por alumno y sesión (fecha + hora). Existir una fila implica que la sesión se pasó lista. */
+export interface Attendance extends Stamp {
+  id: ID; // `${studentId}|${date}|${slot}`
+  studentId: ID;
+  groupId: ID;
+  date: string; // AAAA-MM-DD
+  slot: string;
+  status: AttStatus;
+  note?: string;
 }

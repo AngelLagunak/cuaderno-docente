@@ -4,10 +4,12 @@ import { db, seed } from './data/db';
 import { Config } from './ui/Config';
 import { Curriculum } from './ui/Curriculum';
 import { Groups } from './ui/Groups';
+import { Notebook } from './ui/Notebook';
 import { Planner } from './ui/Planner';
 import { Settings } from './ui/Settings';
 
 const TABS = [
+  ['notes', 'Cuaderno'],
   ['groups', 'Grupos'],
   ['plan', 'Planificador'],
   ['curr', 'Currículo'],
@@ -17,7 +19,7 @@ const TABS = [
 type Tab = (typeof TABS)[number][0];
 
 export function App() {
-  const [tab, setTab] = useState<Tab>('groups');
+  const [tab, setTab] = useState<Tab>('notes');
   const [sid, setSid] = useState('');
   const subjects = useLiveQuery(() => db.subjects.toArray());
 
@@ -40,6 +42,7 @@ export function App() {
         {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'conn' && <Settings />}
+      {subject && tab === 'notes' && <Notebook key={subject.id} subject={subject} />}
       {subject && tab === 'groups' && <Groups key={subject.id} subject={subject} />}
       {subject && tab === 'plan' && <Planner key={subject.id} subject={subject} />}
       {subject && tab === 'curr' && <Curriculum key={subject.id} subject={subject} />}

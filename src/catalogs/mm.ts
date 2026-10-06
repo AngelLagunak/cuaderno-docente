@@ -54,7 +54,7 @@ const subject: Subject = {
     { id: 't1', name: '1.ª evaluación', weight: 50 },
     { id: 't2', name: '2.ª evaluación', weight: 50 },
   ],
-  config: { passMark: 5, termDecimals: 1, finalDecimals: 1, minPerInstrument: false, latePenaltyPct: 30 },
+  config: { passMark: 5, termDecimals: 1, finalDecimals: 1, minPerInstrument: false, latePenaltyPct: 30, absenceWarnPct: 20, annualSessions: 54 },
 };
 
 export const mm = { subject, nodes, links: [] };

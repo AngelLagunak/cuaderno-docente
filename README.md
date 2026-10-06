@@ -36,3 +36,4 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - **Grupos**: alumnos por pegado o CSV (Apellidos, Nombre, correo, NIA).
 - **Planificador**: unidades, actividades (instrumento, evaluación, peso, criterios opcionales) y cobertura.
 - **Cuaderno**: tabla alumnos × actividades por evaluación, vista por actividad (con comentario), vista Final y exportación CSV. Marca T = entrega tardía.
+- **Asistencia**: pase de lista por fecha y hora (P/A/R/J), resumen con aviso de faltas injustificadas y exportación CSV por sesión y semanal. Umbral y sesiones anuales en Configuración.

@@ -36,3 +36,12 @@ textarea { font: inherit; width:100%; padding:8px 10px; border:1px solid var(--l
 .tabs { display:flex; gap:6px; flex-wrap:wrap; margin:8px 0; }
 h3 { margin:16px 0 4px; font-size:1rem; }
 .num { width:90px; }
+.tw { overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+table.t { border-collapse:collapse; font-size:.85rem; width:100%; }
+table.t th, table.t td { padding:4px 6px; border-bottom:1px solid var(--line); text-align:center; white-space:nowrap; }
+table.t th { font-weight:600; color:var(--mute); vertical-align:bottom; max-width:110px; overflow:hidden; text-overflow:ellipsis; }
+table.t td:first-child, table.t th:first-child { position:sticky; left:0; background:var(--card); text-align:left; z-index:1; }
+table.t .sum { background:var(--chip); font-weight:600; }
+input.cell { width:54px; padding:5px 4px; text-align:center; }
+input.bad { border-color:var(--warn); }
+.late { padding:1px 6px; font-size:.7rem; margin-left:2px; }

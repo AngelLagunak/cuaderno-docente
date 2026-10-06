@@ -35,3 +35,4 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - **Currículo**: añadir, editar y borrar elementos; vincular es opcional.
 - **Grupos**: alumnos por pegado o CSV (Apellidos, Nombre, correo, NIA).
 - **Planificador**: unidades, actividades (instrumento, evaluación, peso, criterios opcionales) y cobertura.
+- **Cuaderno**: tabla alumnos × actividades por evaluación, vista por actividad (con comentario), vista Final y exportación CSV. Marca T = entrega tardía.

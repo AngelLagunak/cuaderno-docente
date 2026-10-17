@@ -37,3 +37,4 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - **Planificador**: unidades, actividades (instrumento, evaluación, peso, criterios opcionales) y cobertura.
 - **Cuaderno**: tabla alumnos × actividades por evaluación, vista por actividad (con comentario), vista Final y exportación CSV. Marca T = entrega tardía.
 - **Asistencia**: pase de lista por fecha y hora (P/A/R/J), resumen con aviso de faltas injustificadas y exportación CSV por sesión y semanal. Umbral y sesiones anuales en Configuración.
+- **Informes**: ficha de alumno (notas por instrumento, radar competencial con media del grupo, origen de cada nota) imprimible como PDF; vista de grupo (media, aprobados, distribución, medias por evaluación, radar, mejores y peores elementos).

@@ -38,3 +38,10 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - **Cuaderno**: tabla alumnos × actividades por evaluación, vista por actividad (con comentario), vista Final y exportación CSV. Marca T = entrega tardía.
 - **Asistencia**: pase de lista por fecha y hora (P/A/R/J), resumen con aviso de faltas injustificadas y exportación CSV por sesión y semanal. Umbral y sesiones anuales en Configuración.
 - **Informes**: ficha de alumno (notas por instrumento, radar competencial con media del grupo, origen de cada nota) imprimible como PDF; vista de grupo (media, aprobados, distribución, medias por evaluación, radar, mejores y peores elementos).
+- **Classroom**: Grupos → importar alumnos; Planificador → importar tareas; Cuaderno (Por actividad) → traer notas y rúbrica. Solo lectura: la API no permite escribir notas de rúbrica.
+- **Comunicación**: correo individual con plantillas y marcadores, o anuncio en el tablón; historial.
+
+## Apps Script (Classroom y correo)
+1. Configuración del proyecto → marca «Mostrar archivo appsscript.json» y pega el de `apps-script/`.
+2. Pega el nuevo `Code.gs`. Ejecuta `autorizar` y acepta los permisos.
+3. Implementar → Gestionar implementaciones → lápiz → Versión: Nueva versión → Implementar (la URL no cambia).

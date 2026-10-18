@@ -45,3 +45,8 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 1. Configuración del proyecto → marca «Mostrar archivo appsscript.json» y pega el de `apps-script/`.
 2. Pega el nuevo `Code.gs`. Ejecuta `autorizar` y acepta los permisos.
 3. Implementar → Gestionar implementaciones → lápiz → Versión: Nueva versión → Implementar (la URL no cambia).
+
+## Sincronización (Fase 7)
+- Archivo `cuaderno-docente-db.json` en tu Drive. Fusión por registro (gana el `updatedAt` más reciente). Estado visible arriba.
+- Actualiza `Code.gs` y `appsscript.json` (nuevos permisos: Drive y disparadores), ejecuta `autorizar` y `instalarCopiaDiaria`, y crea nueva versión de la implementación.
+- Copias diarias en la carpeta «Cuaderno docente copias» (últimas 30). Exportar/importar JSON desde Conexión.

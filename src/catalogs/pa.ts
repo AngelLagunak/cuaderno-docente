@@ -2,7 +2,8 @@ import { linkId } from '../core/model';
 import type { CLink, CNode, Subject } from '../core/model';
 
 export const PA_ID = 'pa-1bach';
-const now = Date.now();
+// 0: el catálogo precargado nunca pisa a datos sincronizados.
+const now = 0;
 const nid = (l: string, c: string) => `${PA_ID}/${l}:${c}`;
 let order = 0;
 const N = (level: string, code: string, title: string, extra: Partial<CNode> = {}): CNode => ({

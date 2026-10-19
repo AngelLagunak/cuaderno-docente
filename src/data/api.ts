@@ -20,7 +20,9 @@ export async function callScript<T = unknown>(action: string, data: Record<strin
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action, token, ...data }),
   });
-  const j = await r.json();
+  const txt = await r.text();
+  let j: { ok: boolean; error?: string; data?: unknown };
+  try { j = JSON.parse(txt); } catch { throw new Error(`Respuesta no válida del servidor (HTTP ${r.status}): ${txt.slice(0, 160) || 'vacía'}`); }
   if (!j.ok) throw new Error(j.error === '403' ? 'Token incorrecto (403).' : String(j.error ?? 'Error desconocido'));
   return j.data as T;
 }

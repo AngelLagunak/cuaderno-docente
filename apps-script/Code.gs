@@ -187,7 +187,10 @@ function sync_(req) {
   lock.waitLock(25000);
   try {
     var file = dbFile_();
-    var db = JSON.parse(file.getBlob().getDataAsString());
+    var raw = file.getBlob().getDataAsString();
+    var db = raw.replace(/\s/g, '') === '' ? { version: 0, tables: {} } : JSON.parse(raw);
+    if (!db.tables) db.tables = {};
+    if (!db.version) db.version = 0;
     var since = Number(req.since) || 0, push = req.push || {}, accepted = {}, changed = false;
     var v = db.version + 1;
     Object.keys(push).forEach(function (t) {

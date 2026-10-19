@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { linkId } from '../core/model';
-import type { Activity, Attendance, CLink, CNode, Grade, Group, LearningUnit, Stamp, Student, Subject } from '../core/model';
+import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Stamp, Student, Subject } from '../core/model';
 import { catalogs } from '../catalogs';
 
 class DB extends Dexie {
@@ -13,6 +13,8 @@ class DB extends Dexie {
   grades!: Table<Grade, string>;
   units!: Table<LearningUnit, string>;
   attendance!: Table<Attendance, string>;
+  messages!: Table<Message, string>;
+  templates!: Table<Template, string>;
 
   constructor() {
     super('cuaderno-docente');
@@ -27,6 +29,7 @@ class DB extends Dexie {
     });
     this.version(2).stores({ units: 'id, subjectId' });
     this.version(3).stores({ attendance: 'id, groupId, studentId, date' });
+    this.version(4).stores({ messages: 'id, groupId, sentAt', templates: 'id' });
   }
 }
 

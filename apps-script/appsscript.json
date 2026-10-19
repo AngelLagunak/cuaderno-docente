@@ -14,7 +14,4 @@
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/script.scriptapp"
   ]
-  cuaderno-docente-*.json
-   notas-*.csv
-   asistencia-*.csv
 }

@@ -1,2 +1,5 @@
 node_modules
 dist
+cuaderno-docente-*.json
+notas-*.csv
+asistencia-*.csv

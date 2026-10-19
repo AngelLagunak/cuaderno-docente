@@ -49,15 +49,31 @@ export async function syncNow() {
     const startedAt = Date.now();
     const since = num('syncSince');
     const pushAt = num('syncPushAt');
-    const push: Record<string, Rec[]> = {};
+    // Envío en lotes de ~100 registros para no saturar al Apps Script.
+    const chunks: Record<string, Rec[]>[] = [];
+    let cur: Record<string, Rec[]> = {};
+    let n = 0;
     let pushed = 0;
     for (const t of TABLES) {
       const rows = await tab(t).filter((r) => r.updatedAt > pushAt).toArray();
-      if (rows.length) { push[t] = rows; pushed += rows.length; }
+      for (let i = 0; i < rows.length; i += 100) {
+        const part = rows.slice(i, i + 100);
+        if (n > 0 && n + part.length > 100) { chunks.push(cur); cur = {}; n = 0; }
+        (cur[t] ??= []).push(...part);
+        n += part.length;
+        pushed += part.length;
+      }
     }
-    const res = await callScript<{ version: number; pull: Record<string, Rec[]> }>('sync', { since, push });
-    const pulled = await applyRemote(res.pull);
-    localStorage.setItem('syncSince', String(res.version));
+    if (n > 0 || chunks.length === 0) chunks.push(cur);
+    let version = since;
+    let pulled = 0;
+    for (const push of chunks) {
+      set({ msg: `Sincronizando… (${chunks.indexOf(push) + 1}/${chunks.length})` });
+      const res = await callScript<{ version: number; pull: Record<string, Rec[]> }>('sync', { since: version, push });
+      pulled += await applyRemote(res.pull);
+      version = res.version;
+    }
+    localStorage.setItem('syncSince', String(version));
     localStorage.setItem('syncPushAt', String(startedAt));
     set({ state: 'ok', last: Date.now(), pending: await pendingCount(), msg: `${pushed} enviados, ${pulled} recibidos` });
   } catch (e) {

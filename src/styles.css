@@ -45,3 +45,9 @@ table.t .sum { background:var(--chip); font-weight:600; }
 input.cell { width:54px; padding:5px 4px; text-align:center; }
 input.bad { border-color:var(--warn); }
 .late { padding:1px 6px; font-size:.7rem; margin-left:2px; }
+@media print {
+  .noprint { display:none !important; }
+  body { background:#fff; color:#000; }
+  .card, .tw { border:0; }
+  .wrap { max-width:none; padding:0; }
+}

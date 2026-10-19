@@ -1,7 +1,8 @@
 import type { CNode, Subject } from '../core/model';
 
 export const MM_ID = 'mm-2joy';
-const now = Date.now();
+// 0: el catálogo precargado nunca pisa a datos sincronizados.
+const now = 0;
 
 const UD: [string, string, string[]][] = [
   ['UD1', '1.ª eval.', [

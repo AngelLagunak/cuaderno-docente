@@ -3,7 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { useGroups, useNodes } from './hooks';
 import { NodePicker } from './NodePicker';
-import type { Activity, CNode, LearningUnit, Subject } from '../core/model';
+import { callScript } from '../data/api';
+import type { CWork } from '../data/api';
+import type { Activity, CNode, Group, LearningUnit, Subject } from '../core/model';
 
 function UnitForm(p: { subject: Subject; nodes: CNode[]; init: LearningUnit; onDone: () => void }) {
   const [u, setU] = useState(p.init);
@@ -61,6 +63,60 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; i
   );
 }
 
+
+function WorkImport(p: { subject: Subject; group: Group; existing: Activity[]; onDone: () => void }) {
+  const [list, setList] = useState<CWork[] | null>(null);
+  const [sel, setSel] = useState<string[]>([]);
+  const [termId, setTermId] = useState(p.subject.terms[0]?.id ?? '');
+  const [instId, setInstId] = useState(p.subject.instruments[0]?.id ?? '');
+  const [msg, setMsg] = useState('');
+  const have = new Set(p.existing.map((a) => a.classroomWorkId).filter(Boolean));
+
+  async function load() {
+    setMsg('Cargando…');
+    try { setList(await callScript<CWork[]>('classroom.work.list', { courseId: p.group.classroomCourseId })); setMsg(''); }
+    catch (e) { setMsg('Error: ' + (e as Error).message); }
+  }
+  async function imp() {
+    const now = Date.now();
+    const rows = (list ?? []).filter((w) => sel.includes(w.id)).map((w): Activity => ({
+      id: uid(), subjectId: p.subject.id, groupId: p.group.id, termId, instrumentId: instId, title: w.title, weight: 1,
+      nodeIds: [], date: w.dueDate || undefined, classroomWorkId: w.id, maxPoints: w.maxPoints ?? undefined, updatedAt: now,
+    }));
+    await db.activities.bulkPut(rows);
+    p.onDone();
+  }
+  return (
+    <div className="card">
+      <b>Tareas de Classroom</b>
+      {!list && <div className="row"><button onClick={load}>Cargar tareas</button></div>}
+      {msg && <p className="mute">{msg}</p>}
+      {list && (
+        <>
+          <div className="row">
+            <select value={termId} onChange={(e) => setTermId(e.target.value)}>{p.subject.terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+            <select value={instId} onChange={(e) => setInstId(e.target.value)}>{p.subject.instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
+          </div>
+          <p className="mute">Evaluación e instrumento se aplican a todas las seleccionadas; luego puedes editar cada una.</p>
+          <div className="picker">
+            {list.map((w) => (
+              <label key={w.id}>
+                <input type="checkbox" disabled={have.has(w.id)} checked={sel.includes(w.id) || have.has(w.id)}
+                  onChange={(e) => setSel(e.target.checked ? [...sel, w.id] : sel.filter((x) => x !== w.id))} />
+                <span>{w.title} <span className="mute">{w.maxPoints != null ? `· ${w.maxPoints} pts` : '· sin nota'}{w.dueDate ? ` · ${w.dueDate}` : ''}{have.has(w.id) ? ' · ya importada' : ''}</span></span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="row">
+        {list && <button className="on" disabled={!sel.length} onClick={imp}>Importar ({sel.length})</button>}
+        <button onClick={p.onDone}>Cerrar</button>
+      </div>
+    </div>
+  );
+}
+
 export function Planner({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
@@ -72,6 +128,7 @@ export function Planner({ subject }: { subject: Subject }) {
   const acts = (actsRaw ?? []).filter((a) => !a.deleted && a.groupId === group?.id);
   const [eu, setEu] = useState<LearningUnit | null>(null);
   const [ea, setEa] = useState<Activity | null>(null);
+  const [imp, setImp] = useState(false);
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const instName = (id: string) => subject.instruments.find((i) => i.id === id)?.name ?? '?';
@@ -113,7 +170,9 @@ export function Planner({ subject }: { subject: Subject }) {
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
             </select>
             {!ea && <button onClick={newAct}>+ Actividad</button>}
+            {group?.classroomCourseId && <button onClick={() => setImp(!imp)}>Importar de Classroom</button>}
           </div>
+          {imp && group && <WorkImport subject={subject} group={group} existing={acts} onDone={() => setImp(false)} />}
           {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} init={ea} onDone={() => setEa(null)} />}
           {subject.terms.map((t) => {
             const list = acts.filter((a) => a.termId === t.id);
@@ -127,7 +186,7 @@ export function Planner({ subject }: { subject: Subject }) {
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : ''}
                         </div>
                         <div className="chips">
                           {a.nodeIds.map((id) => byId.get(id)).filter((n): n is CNode => !!n).map((n) => <span className="chip" key={n.id} title={n.title}>{n.code}</span>)}

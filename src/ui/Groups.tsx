@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { useGroups } from './hooks';
-import type { Student, Subject } from '../core/model';
+import { callScript } from '../data/api';
+import type { CCourse, CStudent } from '../data/api';
+import type { Group, Student, Subject } from '../core/model';
 
 type Row = { lastName: string; firstName: string; email?: string; nia?: string };
 
@@ -40,6 +42,67 @@ function StudentRow({ s }: { s: Student }) {
         <button className="on" onClick={async () => { await db.students.put({ ...d, updatedAt: Date.now() }); setEdit(false); }}>Guardar</button>
         <button onClick={() => setEdit(false)}>Cancelar</button>
       </div>
+    </div>
+  );
+}
+
+
+function ClassroomImport({ group, students }: { group: Group; students: Student[] }) {
+  const [courses, setCourses] = useState<CCourse[] | null>(null);
+  const [courseId, setCourseId] = useState(group.classroomCourseId ?? '');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  async function run(f: () => Promise<void>) {
+    setBusy(true); setMsg('');
+    try { await f(); } catch (e) { setMsg('Error: ' + (e as Error).message); } finally { setBusy(false); }
+  }
+  const loadCourses = () => run(async () => {
+    const c = await callScript<CCourse[]>('classroom.courses');
+    setCourses(c);
+    if (!courseId && c[0]) setCourseId(c[0].id);
+  });
+  const importStudents = () => run(async () => {
+    const list = await callScript<CStudent[]>('classroom.students', { courseId });
+    const now = Date.now();
+    const name = (a: string, b: string) => (a + b).toLowerCase();
+    const byUser = new Map(students.filter((s) => s.classroomUserId).map((s) => [s.classroomUserId!, s]));
+    const byMail = new Map(students.filter((s) => s.email).map((s) => [s.email!.toLowerCase(), s]));
+    const byName = new Map(students.map((s) => [name(s.lastName, s.firstName), s]));
+    let added = 0, linked = 0;
+    const puts: Student[] = [];
+    for (const c of list) {
+      const last = c.familyName || c.fullName, first = c.givenName;
+      const ex = byUser.get(c.userId) ?? (c.email ? byMail.get(c.email.toLowerCase()) : undefined) ?? byName.get(name(last, first));
+      if (ex) {
+        if (ex.classroomUserId !== c.userId || (!ex.email && c.email)) {
+          puts.push({ ...ex, classroomUserId: c.userId, email: ex.email || c.email || undefined, updatedAt: now });
+          linked++;
+        }
+      } else {
+        puts.push({ id: uid(), groupId: group.id, lastName: last, firstName: first, email: c.email || undefined, classroomUserId: c.userId, updatedAt: now });
+        added++;
+      }
+    }
+    await db.students.bulkPut(puts);
+    await db.groups.put({ ...group, classroomCourseId: courseId, updatedAt: now });
+    setMsg(`${list.length} alumnos en Classroom: ${added} nuevos, ${linked} enlazados o actualizados.`);
+  });
+
+  return (
+    <div className="card">
+      <b>Classroom</b>
+      <p className="mute">{group.classroomCourseId ? 'Grupo enlazado a un curso de Classroom.' : 'Enlaza el grupo con un curso para importar alumnos, tareas y notas.'}</p>
+      <div className="row">
+        <button onClick={loadCourses} disabled={busy}>{courses ? 'Recargar cursos' : 'Cargar mis cursos'}</button>
+        {courses && (
+          <select value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+            {courses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.section ? ` · ${c.section}` : ''}</option>)}
+          </select>
+        )}
+        {courses && <button className="on" onClick={importStudents} disabled={busy || !courseId}>Importar alumnos</button>}
+      </div>
+      {msg && <p className="mute">{msg}</p>}
     </div>
   );
 }
@@ -112,6 +175,7 @@ export function Groups({ subject }: { subject: Subject }) {
             </div>
             {msg && <p className="mute">{msg}</p>}
           </div>
+          <ClassroomImport key={group.id + (group.classroomCourseId ?? '')} group={group} students={students} />
           <div className="card">
             <b>{students.length} alumnos</b>
             {students.map((s) => <StudentRow key={s.id + s.updatedAt} s={s} />)}

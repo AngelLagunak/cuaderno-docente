@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
+import { callScript } from '../data/api';
+import type { CGrades } from '../data/api';
 import { useGroups } from './hooks';
 import { finalResult, round, termResult, wmean, effectiveValue } from '../core/evaluation';
 import type { Num } from '../core/evaluation';
@@ -48,6 +50,8 @@ export function Notebook({ subject }: { subject: Subject }) {
   const [view, setView] = useState<'table' | 'act' | 'final'>('table');
   const [termId, setTermId] = useState('');
   const [actId, setActId] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = (stRaw ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es'));
@@ -84,6 +88,42 @@ export function Notebook({ subject }: { subject: Subject }) {
   }
 
   if (!group) return <p className="mute">Crea un grupo y alumnos en la pestaña Grupos.</p>;
+
+  async function pullGrades() {
+    if (!act?.classroomWorkId || !group?.classroomCourseId) return;
+    setBusy(true); setMsg('Consultando Classroom…');
+    try {
+      const r = await callScript<CGrades>('classroom.grades', { courseId: group.classroomCourseId, courseWorkId: act.classroomWorkId });
+      const max = r.maxPoints ?? act.maxPoints;
+      if (!max) throw new Error('La tarea no tiene puntuación máxima en Classroom.');
+      const byUser = new Map(students.filter((s) => s.classroomUserId).map((s) => [s.classroomUserId!, s]));
+      const fresh: [Student, number | null, Grade['rubric']][] = [];
+      const changed: [Student, number | null, Grade['rubric']][] = [];
+      let unmatched = 0;
+      for (const sub of r.submissions) {
+        const st = byUser.get(sub.userId);
+        if (!st) { unmatched++; continue; }
+        const pts = sub.assignedGrade ?? sub.draftGrade;
+        const v = pts == null ? null : Math.round((pts / max) * 1000) / 100;
+        if (v == null && !sub.rubricGrades.length) continue;
+        const cur = gm.get(`${st.id}|${act.id}`)?.value ?? null;
+        (cur == null || v == null || cur === v ? fresh : changed).push([st, v, sub.rubricGrades.length ? sub.rubricGrades : undefined]);
+      }
+      const overwrite = changed.length > 0 && confirm(`${changed.length} alumnos ya tienen una nota distinta. ¿Sobrescribir con la de Classroom?`);
+      for (const [st, v, rb] of [...fresh, ...(overwrite ? changed : [])]) {
+        await saveGrade(st.id, act.id, { ...(v != null ? { value: v } : {}), ...(rb ? { rubric: rb } : {}) });
+      }
+      if (r.rubric || act.maxPoints !== max) await db.activities.put({ ...act, maxPoints: max, ...(r.rubric ? { rubric: r.rubric } : {}), updatedAt: Date.now() });
+      setMsg(`Importadas ${fresh.length + (overwrite ? changed.length : 0)} notas` +
+        (changed.length && !overwrite ? `, ${changed.length} distintas sin sobrescribir` : '') +
+        (unmatched ? `, ${unmatched} alumnos de Classroom sin coincidencia (importa antes los alumnos)` : '') +
+        (r.rubric ? '. Rúbrica incluida.' : r.rubricError ? `. Rúbrica no disponible: ${r.rubricError}` : '. La tarea no tiene rúbrica.'));
+    } catch (e) {
+      setMsg('Error: ' + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const LateBtn = ({ s, a }: { s: Student; a: Activity }) => {
     const g = gm.get(`${s.id}|${a.id}`);
@@ -159,15 +199,31 @@ export function Notebook({ subject }: { subject: Subject }) {
       {students.length > 0 && acts.length > 0 && view === 'act' && act && (
         <div className="card">
           <b>{act.title}</b>
-          <div className="mute">{instName(act.instrumentId)} · peso {act.weight}</div>
+          <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}</div>
+          {act.classroomWorkId && group.classroomCourseId && (
+            <div className="row"><button className="small" disabled={busy} onClick={pullGrades}>Traer notas de Classroom</button></div>
+          )}
+          {msg && <p className="mute">{msg}</p>}
           {students.map((s) => {
             const g = gm.get(`${s.id}|${act.id}`);
             return (
-              <div className="issue sp" key={s.id} style={{ alignItems: 'center' }}>
-                <span style={{ flex: 1 }}>{s.lastName}, {s.firstName}</span>
-                <input className="cell" style={{ width: 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
-                  onBlur={(e) => e.target.value !== (g?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />
-                <span><Cell g={g} s={s} a={act} /><LateBtn s={s} a={act} /></span>
+              <div key={s.id}>
+                <div className="issue sp" style={{ alignItems: 'center' }}>
+                  <span style={{ flex: 1 }}>{s.lastName}, {s.firstName}</span>
+                  <input className="cell" style={{ width: 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
+                    onBlur={(e) => e.target.value !== (g?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />
+                  <span><Cell g={g} s={s} a={act} /><LateBtn s={s} a={act} /></span>
+                </div>
+                {act.rubric && g?.rubric?.length ? (
+                  <details className="mute" style={{ padding: '2px 0 6px 8px' }}>
+                    <summary>Rúbrica</summary>
+                    {act.rubric.criteria.map((c) => {
+                      const rg = g.rubric!.find((x) => x.criterionId === c.id);
+                      const lv = c.levels.find((l) => l.id === rg?.levelId);
+                      return <div key={c.id}>{c.title || 'Criterio'}: {lv?.title || '—'} ({rg?.points ?? '—'} pts)</div>;
+                    })}
+                  </details>
+                ) : null}
               </div>
             );
           })}

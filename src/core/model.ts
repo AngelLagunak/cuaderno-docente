@@ -75,8 +75,8 @@ export interface CLink extends Stamp {
 export const linkId = (subjectId: ID, relation: string, fromId: ID, toId: ID) =>
   `${subjectId}/${relation}:${fromId}>${toId}`;
 
-export interface Group extends Stamp { id: ID; subjectId: ID; name: string; schoolYear: string }
-export interface Student extends Stamp { id: ID; groupId: ID; firstName: string; lastName: string; email?: string; nia?: string }
+export interface Group extends Stamp { id: ID; subjectId: ID; name: string; schoolYear: string; classroomCourseId?: string }
+export interface Student extends Stamp { id: ID; groupId: ID; firstName: string; lastName: string; email?: string; nia?: string; classroomUserId?: string }
 
 /** Una actividad pertenece a un instrumento y a un trimestre. Los nodos curriculares son opcionales. */
 export interface Activity extends Stamp {
@@ -89,6 +89,9 @@ export interface Activity extends Stamp {
   weight: number;
   nodeIds: ID[];
   unitId?: ID;
+  classroomWorkId?: string;
+  maxPoints?: number;
+  rubric?: RubricDef;
   date?: string;
 }
 
@@ -99,6 +102,7 @@ export interface Grade extends Stamp {
   value: number | null;
   late?: boolean;
   comment?: string;
+  rubric?: RubricGrade[];
 }
 
 /** Unidad didáctica: la programa el docente (no se precarga). */
@@ -124,3 +128,23 @@ export interface Attendance extends Stamp {
   status: AttStatus;
   note?: string;
 }
+
+export interface RubricDef {
+  id: string;
+  criteria: { id: string; title: string; levels: { id: string; title: string; points: number }[] }[];
+}
+export interface RubricGrade { criterionId: string; levelId?: string; points?: number | null }
+
+export interface Message extends Stamp {
+  id: ID;
+  groupId: ID;
+  kind: 'mail' | 'announcement';
+  subject: string;
+  body: string;
+  targets: ID[];
+  sentAt: number;
+  status: 'ok' | 'error';
+  info?: string;
+}
+
+export interface Template extends Stamp { id: ID; name: string; subject: string; body: string }

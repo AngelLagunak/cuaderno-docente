@@ -44,6 +44,14 @@ table.t td:first-child, table.t th:first-child { position:sticky; left:0; backgr
 table.t .sum { background:var(--chip); font-weight:600; }
 input.cell { width:54px; padding:5px 4px; text-align:center; }
 input.bad { border-color:var(--warn); }
+span.cell { display:inline-block; width:54px; padding:5px 4px; text-align:center; }
+.calc { background:var(--chip); border-radius:8px; }
+.items { padding:0 0 8px 12px; border-bottom:1px solid var(--line); }
+.item { display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:3px 0; font-size:.85rem; }
+.item b { min-width:52px; }
+.lvls { display:inline-flex; gap:4px; }
+.lvls button { min-width:34px; }
+table.c td { font-variant-numeric: tabular-nums; }
 .late { padding:1px 6px; font-size:.7rem; margin-left:2px; }
 @media print {
   .noprint { display:none !important; }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { review } from './curriculum';
+import { activitiesWithoutItems, coverage, review } from './curriculum';
+import type { Activity, LearningUnit } from './model';
 import { pa } from '../catalogs/pa';
 import { mm } from '../catalogs/mm';
 
@@ -41,5 +42,41 @@ describe('review', () => {
   });
   it('Modelado y Maquetismo no tiene relaciones que revisar', () => {
     expect(review(mm.subject, mm.nodes, [])).toEqual([]);
+  });
+});
+
+const act = (id: string, instrumentId: string, nodeIds: string[]): Activity => ({
+  id, subjectId: pa.subject.id, groupId: 'g', termId: 't1', instrumentId, title: id, weight: 1, nodeIds, updatedAt: 0,
+});
+
+describe('activitiesWithoutItems', () => {
+  it('avisa de actividades sin criterio ni indicador (saberes y CE no cuentan)', () => {
+    const acts = [
+      act('a', 'proy', ['pa-1bach/crit:1.1']),
+      act('b', 'proy', ['pa-1bach/saber:PART.A.1', 'pa-1bach/ce:CE.PA.1']),
+      act('c', 'exam', []),
+      { ...act('d', 'exam', []), deleted: true },
+    ];
+    expect(activitiesWithoutItems(pa.subject, pa.nodes, acts).map((a) => a.id)).toEqual(['b', 'c']);
+  });
+});
+
+describe('coverage', () => {
+  const units: LearningUnit[] = [{ id: 'u1', subjectId: pa.subject.id, code: 'UD1', title: '', termId: 't1', plannedSessions: 0, nodeIds: ['pa-1bach/crit:1.1', 'pa-1bach/crit:3.2'], updatedAt: 0 }];
+  const acts = [
+    act('a', 'proy', ['pa-1bach/ind:1.1.1']),
+    act('b', 'proy', ['pa-1bach/crit:1.1', 'pa-1bach/ind:1.1.2']),
+    act('c', 'exam', ['pa-1bach/crit:3.2']),
+  ];
+  const rows = new Map(coverage(pa.subject, pa.nodes, pa.links, units, acts).map((r) => [r.node.code, r]));
+  it('cuenta actividades por instrumento y sube de indicador a criterio', () => {
+    expect(rows.get('1.1')).toMatchObject({ units: 1, total: 2, byInstrument: { proy: 2 } });
+    expect(rows.get('1.1.1')).toMatchObject({ units: 0, total: 1 });
+    expect(rows.get('3.2')).toMatchObject({ units: 1, total: 1, byInstrument: { exam: 1 } });
+  });
+  it('lista solo elementos calificables y marca los que no se evalúan', () => {
+    expect(rows.has('CE.PA.1')).toBe(false);
+    expect(rows.get('5.4')!.total).toBe(0);
+    expect(rows.size).toBe(15 + 29);
   });
 });

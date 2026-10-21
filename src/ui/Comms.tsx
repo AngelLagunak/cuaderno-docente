@@ -3,8 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { callScript } from '../data/api';
 import { useGroups } from './hooks';
-import { finalResult, round } from '../core/evaluation';
-import type { Grade, Student, Subject, Template } from '../core/model';
+import { finalResult, indexGrades, noGrades, round } from '../core/evaluation';
+import type { Student, Subject, Template } from '../core/model';
 
 const DEFAULTS: Omit<Template, 'updatedAt'>[] = [
   { id: 'def-falta', name: 'Aviso de falta', subject: 'Aviso de faltas de asistencia – {{materia}}',
@@ -49,9 +49,8 @@ export function Comms({ subject }: { subject: Subject }) {
   }, [tplRaw]);
 
   const vars = (s: Student): Record<string, string> => {
-    const gm = new Map<string, Grade>();
-    for (const g of (grRaw ?? []).filter((x) => !x.deleted && x.studentId === s.id)) gm.set(g.activityId, g);
-    const f = finalResult(subject, acts, gm);
+    const sg = indexGrades((grRaw ?? []).filter((x) => x.studentId === s.id)).get(s.id) ?? noGrades();
+    const f = finalResult(subject, acts, sg);
     const faltas = (attRaw ?? []).filter((r) => !r.deleted && r.studentId === s.id && r.status === 'A').length;
     return {
       nombre: s.firstName, apellidos: s.lastName, grupo: group?.name ?? '', materia: subject.name,

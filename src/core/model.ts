@@ -93,14 +93,25 @@ export interface Activity extends Stamp {
   unitId?: ID;
   classroomWorkId?: string;
   maxPoints?: number;
+  /** Rúbrica traída de Classroom (solo lectura). */
   rubric?: RubricDef;
+  /** Rúbrica propia de la app. */
+  rubricId?: ID;
   date?: string;
 }
 
+/**
+ * Sin `nodeId`: nota global de la actividad (id `alumno|actividad`); guarda también la entrega tardía y el comentario.
+ * Con `nodeId`: nota de un criterio en esa actividad (id `alumno|actividad|nodo`). Si hay alguna, la nota de la
+ * actividad es su media y la global se ignora.
+ */
 export interface Grade extends Stamp {
   id: ID;
   studentId: ID;
   activityId: ID;
+  nodeId?: ID;
+  /** Nivel de la rúbrica propia (0 = primer nivel). */
+  level?: number;
   value: number | null;
   late?: boolean;
   comment?: string;
@@ -135,6 +146,23 @@ export interface RubricDef {
   id: string;
   criteria: { id: string; title: string; levels: { id: string; title: string; points: number }[] }[];
 }
+export interface RubricLevel { label: string; value: number }
+/** Rúbrica propia: niveles con su nota y una fila por criterio con el descriptor de cada nivel. */
+export interface Rubric extends Stamp {
+  id: ID;
+  subjectId: ID;
+  name: string;
+  levels: RubricLevel[];
+  rows: { nodeId: ID; text: string[] }[];
+}
+
+export const defaultLevels = (): RubricLevel[] => [
+  { label: 'Insuficiente', value: 2.5 },
+  { label: 'Suficiente', value: 5 },
+  { label: 'Notable', value: 7.5 },
+  { label: 'Sobresaliente', value: 10 },
+];
+
 export interface RubricGrade { criterionId: string; levelId?: string; points?: number | null }
 
 export interface Message extends Stamp {

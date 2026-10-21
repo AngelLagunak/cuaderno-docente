@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../data/db';
+import { db, saveGrade, saveItemGrade } from '../data/db';
 import { callScript } from '../data/api';
 import type { CGrades } from '../data/api';
-import { useGroups } from './hooks';
-import { finalResult, round, termResult, wmean, effectiveValue } from '../core/evaluation';
-import type { Num } from '../core/evaluation';
-import type { Activity, Grade, Student, Subject } from '../core/model';
+import { useGroups, useNodes } from './hooks';
+import { activityBase, activityValue, finalResult, indexGrades, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
+import type { Num, StudentGrades } from '../core/evaluation';
+import { gradedLevels } from '../core/curriculum';
+import type { Activity, CNode, Grade, Rubric, Student, Subject } from '../core/model';
 
 const fmt = (v: Num, d: number) => (v == null ? '—' : v.toFixed(d).replace('.', ','));
 const raw = (v: Num | undefined) => (v == null ? '' : String(v).replace('.', ','));
@@ -17,13 +18,7 @@ const parse = (t: string): Num | undefined => {
   return Number.isFinite(n) && n >= 0 && n <= 10 ? n : undefined;
 };
 
-async function saveGrade(studentId: string, activityId: string, patch: Partial<Grade>) {
-  const id = `${studentId}|${activityId}`;
-  const cur = await db.grades.get(id);
-  await db.grades.put({ id, studentId, activityId, value: null, ...cur, ...patch, updatedAt: Date.now() });
-}
-
-function Cell({ g, s, a }: { g?: Grade; s: Student; a: Activity }) {
+function Cell({ g, label, onSave }: { g?: Grade; label: string; onSave: (v: number | null) => void }) {
   const [bad, setBad] = useState(false);
   return (
     <input
@@ -31,20 +26,52 @@ function Cell({ g, s, a }: { g?: Grade; s: Student; a: Activity }) {
       inputMode="decimal"
       defaultValue={raw(g?.value)}
       key={g?.updatedAt ?? 0}
-      aria-label={`${s.lastName} · ${a.title}`}
+      aria-label={label}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
       onBlur={(e) => {
         const v = parse(e.target.value);
         if (v === undefined) { setBad(true); e.target.value = raw(g?.value); return; }
         setBad(false);
-        if (v !== (g?.value ?? null)) saveGrade(s.id, a.id, { value: v });
+        if (v !== (g?.value ?? null)) onSave(v);
       }}
     />
   );
 }
 
+/** Casilla de la nota de una actividad: editable, o calculada si se ha calificado por criterios. */
+function ActCell({ sg, s, a }: { sg: StudentGrades; s: Student; a: Activity }) {
+  const n = itemGrades(a, sg).length;
+  if (n) return <span className="cell calc" title={`Media de ${n} criterios`}>{fmt(activityBase(a, sg), 2)}</span>;
+  return <Cell g={sg.byActivity.get(a.id)} label={`${s.lastName} · ${a.title}`} onSave={(v) => saveGrade(s.id, a.id, { value: v })} />;
+}
+
+/** Nota de un criterio: botones de nivel si la rúbrica de la actividad tiene fila para él; si no, casilla numérica. */
+function ItemRow({ s, a, node, g, rubric }: { s: Student; a: Activity; node: CNode; g?: Grade; rubric?: Rubric }) {
+  const row = rubric?.rows.find((r) => r.nodeId === node.id);
+  const lv = row && g?.level != null ? rubric!.levels[g.level] : undefined;
+  return (
+    <div className="item">
+      <b title={node.title}>{node.code}</b>
+      {row ? (
+        <span className="lvls">
+          {rubric!.levels.map((l, i) => (
+            <button key={i} className={'small' + (g?.level === i ? ' on' : '')} title={`${l.label} (${raw(l.value)})${row.text[i] ? ' — ' + row.text[i] : ''}`}
+              onClick={() => saveItemGrade(s.id, a.id, node.id, g?.level === i ? { value: null, level: undefined } : { value: l.value, level: i })}>{i + 1}</button>
+          ))}
+        </span>
+      ) : (
+        <Cell g={g} label={`${s.lastName} · ${node.code}`} onSave={(v) => saveItemGrade(s.id, a.id, node.id, { value: v, level: undefined })} />
+      )}
+      <span className="mute">{lv ? `${lv.label} · ${raw(lv.value)}${row?.text[g!.level!] ? ' — ' + row.text[g!.level!] : ''}` : ''}</span>
+    </div>
+  );
+}
+
 export function Notebook({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
+  const nodes = useNodes(subject.id);
+  const rbRaw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
+  const [items, setItems] = useState(true);
   const [gid, setGid] = useState('');
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [view, setView] = useState<'table' | 'act' | 'final'>('table');
@@ -60,23 +87,27 @@ export function Notebook({ subject }: { subject: Subject }) {
   const acts = (acRaw ?? []).filter((a) => !a.deleted).sort((a, b) => termIdx(a.termId) - termIdx(b.termId) || (a.date ?? '').localeCompare(b.date ?? '') || a.title.localeCompare(b.title, 'es'));
   const key = acts.map((a) => a.id).join(',');
   const grRaw = useLiveQuery(() => (acts.length ? db.grades.where('activityId').anyOf(acts.map((a) => a.id)).toArray() : []), [key]);
-  const gm = new Map((grRaw ?? []).filter((g) => !g.deleted).map((g) => [`${g.studentId}|${g.activityId}`, g]));
+  const idx = indexGrades(grRaw ?? []);
+  const none = noGrades();
+  const sgOf = (s: Student) => idx.get(s.id) ?? none;
 
   const term = subject.terms.find((t) => t.id === termId) ?? subject.terms[0];
   const termActs = acts.filter((a) => a.termId === term?.id);
   const act = acts.find((a) => a.id === actId) ?? termActs[0] ?? acts[0];
   const cfg = subject.config;
-  const studentGrades = (s: Student) => new Map(acts.flatMap((a) => { const g = gm.get(`${s.id}|${a.id}`); return g ? [[a.id, g] as [string, Grade]] : []; }));
+  const graded = gradedLevels(subject);
+  const actItems = (a: Activity) => a.nodeIds.map((id) => nodes.find((n) => n.id === id)).filter((n): n is CNode => !!n && graded.has(n.level));
+  const rubricOf = (a: Activity) => (a.rubricId ? (rbRaw ?? []).find((r) => r.id === a.rubricId && !r.deleted) : undefined);
   const instName = (id: string) => subject.instruments.find((i) => i.id === id)?.name ?? '?';
 
   function exportCsv() {
     const q = (x: string) => `"${x.replace(/"/g, '""')}"`;
     const head = ['Apellidos', 'Nombre', ...acts.map((a) => `${a.title} (${subject.terms.find((t) => t.id === a.termId)?.name})`), ...subject.terms.map((t) => t.name), 'Final'];
     const lines = students.map((s) => {
-      const m = studentGrades(s);
+      const m = sgOf(s);
       const f = finalResult(subject, acts, m);
       return [s.lastName, s.firstName,
-        ...acts.map((a) => raw(gm.get(`${s.id}|${a.id}`)?.value)),
+        ...acts.map((a) => raw(round(activityBase(a, m), 2))),
         ...f.terms.map((t) => fmt(round(t.result.value, cfg.termDecimals), cfg.termDecimals)),
         fmt(f.rounded, cfg.finalDecimals)].map((x) => q(String(x))).join(';');
     });
@@ -106,7 +137,7 @@ export function Notebook({ subject }: { subject: Subject }) {
         const pts = sub.assignedGrade ?? sub.draftGrade;
         const v = pts == null ? null : Math.round((pts / max) * 1000) / 100;
         if (v == null && !sub.rubricGrades.length) continue;
-        const cur = gm.get(`${st.id}|${act.id}`)?.value ?? null;
+        const cur = sgOf(st).byActivity.get(act.id)?.value ?? null;
         (cur == null || v == null || cur === v ? fresh : changed).push([st, v, sub.rubricGrades.length ? sub.rubricGrades : undefined]);
       }
       const overwrite = changed.length > 0 && confirm(`${changed.length} alumnos ya tienen una nota distinta. ¿Sobrescribir con la de Classroom?`);
@@ -126,9 +157,9 @@ export function Notebook({ subject }: { subject: Subject }) {
   }
 
   const LateBtn = ({ s, a }: { s: Student; a: Activity }) => {
-    const g = gm.get(`${s.id}|${a.id}`);
-    if (!cfg.latePenaltyPct || g?.value == null) return null;
-    return <button className={'small late' + (g.late ? ' on' : '')} title={`Entrega tardía (−${cfg.latePenaltyPct} %)`} onClick={() => saveGrade(s.id, a.id, { late: !g.late })}>T</button>;
+    const g = sgOf(s).byActivity.get(a.id);
+    if (!cfg.latePenaltyPct || activityBase(a, sgOf(s)) == null) return null;
+    return <button className={'small late' + (g?.late ? ' on' : '')} title={`Entrega tardía (−${cfg.latePenaltyPct} %)`} onClick={() => saveGrade(s.id, a.id, { late: !g?.late })}>T</button>;
   };
 
   return (
@@ -173,11 +204,11 @@ export function Notebook({ subject }: { subject: Subject }) {
             </thead>
             <tbody>
               {students.map((s) => {
-                const r = termResult(subject, acts, studentGrades(s), term.id);
+                const r = termResult(subject, acts, sgOf(s), term.id);
                 return (
                   <tr key={s.id}>
                     <td>{s.lastName}, {s.firstName}</td>
-                    {termActs.map((a) => <td key={a.id}><Cell g={gm.get(`${s.id}|${a.id}`)} s={s} a={a} /><LateBtn s={s} a={a} /></td>)}
+                    {termActs.map((a) => <td key={a.id}><ActCell sg={sgOf(s)} s={s} a={a} /><LateBtn s={s} a={a} /></td>)}
                     {r.byInstrument.map((i) => <td key={i.id} className={'sum' + (cfg.minPerInstrument && i.value != null && i.value < cfg.passMark ? ' warn' : '')}>{fmt(round(i.value, cfg.termDecimals), cfg.termDecimals)}</td>)}
                     <td className="sum" title={r.coverage < 1 ? `Provisional: ${Math.round(r.coverage * 100)} % de instrumentos con datos` : ''}>
                       {fmt(round(r.value, cfg.termDecimals), cfg.termDecimals)}{r.coverage < 1 && r.value != null ? '*' : ''}
@@ -187,33 +218,44 @@ export function Notebook({ subject }: { subject: Subject }) {
               })}
               <tr>
                 <td className="mute">Media</td>
-                {termActs.map((a) => <td key={a.id} className="mute">{fmt(round(wmean(students.map((s): [Num, number] => [effectiveValue(gm.get(`${s.id}|${a.id}`), subject), 1])), 1), 1)}</td>)}
+                {termActs.map((a) => <td key={a.id} className="mute">{fmt(round(wmean(students.map((s): [Num, number] => [activityValue(a, sgOf(s), subject), 1])), 1), 1)}</td>)}
                 <td colSpan={subject.instruments.length + 1} />
               </tr>
             </tbody>
           </table>
         </div>
       )}
-      {view === 'table' && students.length > 0 && <p className="mute">* Provisional: faltan instrumentos por evaluar. Lo no evaluado no cuenta como 0. Se guarda al salir de la casilla o con Intro.</p>}
+      {view === 'table' && students.length > 0 && <p className="mute">* Provisional: faltan instrumentos por evaluar. Lo no evaluado no cuenta como 0. Se guarda al salir de la casilla o con Intro. Las notas sombreadas son la media de los criterios (se editan en «Por actividad»).</p>}
 
       {students.length > 0 && acts.length > 0 && view === 'act' && act && (
         <div className="card">
           <b>{act.title}</b>
-          <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}</div>
+          <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}{rubricOf(act) ? ` · rúbrica «${rubricOf(act)!.name}»` : ''}</div>
+          {actItems(act).length > 0 ? (
+            <label className="row"><input type="checkbox" style={{ width: 'auto' }} checked={items} onChange={(e) => setItems(e.target.checked)} /> Calificar por criterio ({actItems(act).length})</label>
+          ) : (
+            <p className="mute warn">Esta actividad no tiene criterios: solo admite nota global y no aporta al perfil competencial. Añádelos en el Planificador.</p>
+          )}
           {act.classroomWorkId && group.classroomCourseId && (
             <div className="row"><button className="small" disabled={busy} onClick={pullGrades}>Traer notas de Classroom</button></div>
           )}
           {msg && <p className="mute">{msg}</p>}
           {students.map((s) => {
-            const g = gm.get(`${s.id}|${act.id}`);
+            const g = sgOf(s).byActivity.get(act.id);
+            const its = items ? actItems(act) : [];
             return (
               <div key={s.id}>
                 <div className="issue sp" style={{ alignItems: 'center' }}>
                   <span style={{ flex: 1 }}>{s.lastName}, {s.firstName}</span>
                   <input className="cell" style={{ width: 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
                     onBlur={(e) => e.target.value !== (g?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />
-                  <span><Cell g={g} s={s} a={act} /><LateBtn s={s} a={act} /></span>
+                  <span><ActCell sg={sgOf(s)} s={s} a={act} /><LateBtn s={s} a={act} /></span>
                 </div>
+                {its.length > 0 && (
+                  <div className="items">
+                    {its.map((n) => <ItemRow key={n.id} s={s} a={act} node={n} g={sgOf(s).byItem.get(act.id)?.get(n.id)} rubric={rubricOf(act)} />)}
+                  </div>
+                )}
                 {act.rubric && g?.rubric?.length ? (
                   <details className="mute" style={{ padding: '2px 0 6px 8px' }}>
                     <summary>Rúbrica</summary>
@@ -242,7 +284,7 @@ export function Notebook({ subject }: { subject: Subject }) {
             </thead>
             <tbody>
               {students.map((s) => {
-                const f = finalResult(subject, acts, studentGrades(s));
+                const f = finalResult(subject, acts, sgOf(s));
                 const fail = f.rounded != null && f.rounded < cfg.passMark;
                 return (
                   <tr key={s.id}>

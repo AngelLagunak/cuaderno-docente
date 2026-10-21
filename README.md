@@ -155,3 +155,8 @@ En **Currículo**:
 - Las acciones menos frecuentes (traer de Classroom, importar, exportar Excel o CSV, SIGAD) van en el menú **⋯**; «↶ Deshacer» aparece cuando hay algo que deshacer.
 - **Calificar**: tocando el título de una actividad en la tabla (o desde «Por corregir» en Hoy) se abre **un alumno cada vez**: un toque por criterio con los niveles de la rúbrica (o la nota numérica), el comentario y «Siguiente alumno». Debajo, **Se calcula solo**: las competencias específicas (o instrumentos) y la nota de la evaluación del alumno al momento, resaltando lo que mueve esa actividad.
 - En el ordenador, la tabla del grupo queda a la izquierda y el panel a la derecha. «Lista» mantiene la vista de todos a la vez (recuperaciones, entregas vacías, Classroom, observaciones).
+
+## Seguimiento (Fase 22)
+En Planificar → «Seguimiento ›», en el Cuaderno → «Resultados ›» o en el menú lateral:
+- **Programación**: sesiones impartidas, si vas por detrás o con margen en la evaluación actual (sesiones que faltan de sus unidades frente a las que quedan en el calendario hasta su fin), asistencia media, avance de cada unidad (impartidas / previstas; aviso si faltan sesiones en el calendario) y cuántas sesiones dejaron algo pendiente y qué se repite más.
+- **Resultados** por evaluación: media, aprobados, notas sin poner, reparto de notas y media del grupo por competencia específica (o instrumento) con cuántos están por debajo del aprobado.

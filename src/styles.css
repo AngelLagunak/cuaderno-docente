@@ -203,3 +203,26 @@ table.t tr.sel td { background:var(--warnbg); }
 .parts b { font-size:.98rem; }
 .cascade .total { border-top:1px solid var(--line); padding-top:8px; }
 .cascade .total b { font-size:1.25rem; }
+
+/* ---------- Seguimiento ---------- */
+.progress { display:flex; flex-direction:column; gap:12px; max-width:760px; }
+.progress .card { margin:0; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(104px, 1fr)); gap:8px; }
+.tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:2px; }
+.tile > span { font-size:.78rem; color:var(--mute); }
+.tile > b { font-size:1.45rem; font-weight:700; }
+.tile > b.warn { color:var(--warn); }
+.tile small { font-size:.78rem; color:var(--mute); font-weight:500; }
+h2.h2 { margin:0 0 10px; font-size:1rem; }
+.bar { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; font-size:.88rem; }
+.track { height:10px; background:var(--seg); border-radius:999px; overflow:hidden; flex:1; }
+.track > div { height:100%; background:var(--brand); border-radius:999px; }
+.hist { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:2px; align-items:end; height:130px; border-bottom:1px solid var(--line); }
+.hist > div { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%; }
+.hist > div > span { font-size:.8rem; font-weight:600; }
+.hist > div > div { width:64%; max-width:56px; background:var(--brand); border-radius:4px 4px 0 0; }
+.histx { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:2px; margin-top:4px; }
+.histx span { text-align:center; font-size:.75rem; color:var(--mute); }
+.partsTable td:nth-child(2) { width:60%; }
+.hbar { display:flex; align-items:center; gap:10px; }
+.hbar b { min-width:34px; text-align:right; }

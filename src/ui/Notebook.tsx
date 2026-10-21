@@ -52,7 +52,7 @@ function ItemRow({ s, a, node, g, rubric, onRecover }: { s: Student; a: Activity
   );
 }
 
-export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: string }) {
+export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; focusAct?: string; onProgress?: () => void }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const rbRaw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
@@ -268,6 +268,7 @@ export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: s
           <span>Media del grupo <b>{fmt(round(withVal.length ? withVal.reduce((x, y) => x + y, 0) / withVal.length : null, 1), 1)}</b></span>
           <span>Por debajo de {raw(cfg.passMark)} <b className={withVal.some((v) => v < cfg.passMark) ? 'warn' : ''}>{withVal.filter((v) => v < cfg.passMark).length}</b></span>
           <span>Notas sin poner <b>{missing}</b></span>
+          {onProgress && <button className="linkish" onClick={onProgress}>Resultados ›</button>}
         </div>
       )}
 

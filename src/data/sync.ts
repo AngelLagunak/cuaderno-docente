@@ -5,7 +5,7 @@ import { callScript } from './api';
 import type { Stamp } from '../core/model';
 import { shouldPurge } from '../core/io';
 
-const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics', 'sessions'];
+const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics', 'sessions', 'calendars'];
 type Rec = Stamp & { id: string; _v?: number };
 const tab = (t: string) => (db as unknown as Record<string, Table<Rec, string>>)[t];
 

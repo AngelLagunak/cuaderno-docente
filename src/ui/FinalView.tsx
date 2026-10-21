@@ -11,11 +11,11 @@ const SRC = { ordinaria: '', 'pérdida de evaluación continua': 'PEC', extraord
  * Vista Final: evaluaciones, ordinaria, faltas, nota oficial. Debajo, la pérdida de evaluación continua (la marca el
  * docente; la app solo avisa) y la convocatoria extraordinaria para quien no aprueba la ordinaria.
  */
-export function FinalView(p: { subject: Subject; students: Student[]; acts: Activity[]; sgOf: (s: Student) => StudentGrades; curr: Curr; att: Attendance[]; partLabel: string }) {
+export function FinalView(p: { subject: Subject; students: Student[]; acts: Activity[]; sgOf: (s: Student) => StudentGrades; curr: Curr; att: Attendance[]; partLabel: string; planned?: number }) {
   const { subject, students } = p;
   const cfg = subject.config;
   const d = cfg.finalDecimals;
-  const rows = students.map((s) => ({ s, o: outcome(subject, p.acts, p.sgOf(s), p.curr, s), ab: absenceSummary(subject, p.att, s.id) }));
+  const rows = students.map((s) => ({ s, o: outcome(subject, p.acts, p.sgOf(s), p.curr, s), ab: absenceSummary(subject, p.att, s.id, p.planned) }));
   const lp = cfg.lec ?? { folderPct: 50, examPct: 50 };
   const ep = cfg.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 };
   const pecRows = rows.filter((r) => r.ab.warn || r.s.lec);

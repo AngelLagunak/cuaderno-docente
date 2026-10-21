@@ -1,8 +1,8 @@
 import Dexie, { type Table } from 'dexie';
 import { linkId } from '../core/model';
-import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, Session, Stamp, Student, Subject } from '../core/model';
+import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, SchoolCalendar, Session, Stamp, Student, Subject } from '../core/model';
 import { catalogs } from '../catalogs';
-import { migrateSubject } from '../core/curriculum';
+import { migrateSubject, refreshedCatalogNodes } from '../core/curriculum';
 
 class DB extends Dexie {
   subjects!: Table<Subject, string>;
@@ -18,6 +18,7 @@ class DB extends Dexie {
   templates!: Table<Template, string>;
   rubrics!: Table<Rubric, string>;
   sessions!: Table<Session, string>;
+  calendars!: Table<SchoolCalendar, string>;
 
   constructor() {
     super('cuaderno-docente');
@@ -37,6 +38,8 @@ class DB extends Dexie {
     this.version(5).stores({ rubrics: 'id, subjectId' });
     // v6: calendario de sesiones.
     this.version(6).stores({ sessions: 'id, groupId, date' });
+    // v7: calendario escolar común (festivos y evaluaciones del curso).
+    this.version(7).stores({ calendars: 'id' });
   }
 }
 
@@ -45,8 +48,21 @@ export const db = new DB();
 /** Carga los catálogos la primera vez. No sobrescribe materias ya existentes. */
 export async function seed() {
   for (const s of await db.subjects.toArray()) {
-    const m = migrateSubject(s, catalogs.find((c) => c.subject.id === s.id)?.subject);
-    if (m) await saveSubject(m);
+    const cat = catalogs.find((c) => c.subject.id === s.id);
+    const m = migrateSubject(s, cat?.subject);
+    if (m) {
+      await saveSubject(m);
+      const gone = s.relations.filter((r) => !m.relations.some((x) => x.key === r.key)).map((r) => r.key);
+      if (gone.length) {
+        const ls = await db.links.where('subjectId').equals(s.id).filter((l) => gone.includes(l.relation) && !l.deleted).toArray();
+        await db.links.bulkPut(ls.map((l) => ({ ...l, deleted: true, updatedAt: Date.now() })));
+      }
+    }
+    // Textos del catálogo corregidos (descriptores oficiales…): solo en elementos que no se han editado.
+    if (cat) {
+      const upd = refreshedCatalogNodes(await db.nodes.where('subjectId').equals(s.id).toArray(), cat.nodes);
+      if (upd.length) await db.nodes.bulkPut(upd);
+    }
   }
   for (const c of catalogs) {
     if (await db.subjects.get(c.subject.id)) continue;

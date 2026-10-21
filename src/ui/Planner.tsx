@@ -216,6 +216,10 @@ export function Planner({ subject }: { subject: Subject }) {
   const instName = (id: string) => subject.instruments.find((i) => i.id === id)?.name ?? '?';
   const cov = coverage(subject, nodes, lkRaw ?? [], units, acts);
   const noItems = new Set(activitiesWithoutItems(subject, nodes, acts).map((a) => a.id));
+  // Contenidos (saberes básicos): niveles no evaluables sin relaciones; se reparten en las unidades.
+  const contentLevels = subject.levels.filter((l) => !l.graded && !subject.relations.some((r) => r.from === l.key || r.to === l.key));
+  const contents = nodes.filter((n) => contentLevels.some((l) => l.key === n.level));
+  const inUnits = (id: string) => units.filter((u) => u.nodeIds.includes(id));
 
   const newUnit = () => setEu({ id: uid(), subjectId: subject.id, code: `UD${units.length + 1}`, title: '', termId: subject.terms[0]?.id ?? '', plannedSessions: 0, nodeIds: [], updatedAt: Date.now() });
   const newAct = () => setEa({ id: uid(), subjectId: subject.id, groupId: group!.id, termId: subject.terms[0]?.id ?? '', instrumentId: subject.instruments[0]?.id ?? '', title: '', weight: 1, nodeIds: [], updatedAt: Date.now() });
@@ -295,6 +299,22 @@ export function Planner({ subject }: { subject: Subject }) {
             );
           })}
         </>
+      )}
+
+      {contents.length > 0 && (
+        <details className="card">
+          <summary>{contentLevels.map((l) => l.plural).join(', ')} en las unidades ({contents.filter((n) => !inUnits(n.id).length).length} sin unidad)</summary>
+          <p className="mute">Los saberes definen los contenidos: se incluyen en las unidades didácticas (Elementos curriculares de cada unidad), no se evalúan.</p>
+          {contents.map((n) => {
+            const us = inUnits(n.id);
+            return (
+              <div className="issue" key={n.id}>
+                <b>{n.code}</b>
+                <span>{n.title.slice(0, 90)}{n.title.length > 90 ? '…' : ''} <span className={us.length ? 'mute' : 'warn'}>— {us.length ? us.map((u) => u.code).join(', ') : 'sin unidad'}</span></span>
+              </div>
+            );
+          })}
+        </details>
       )}
 
       <h3>Rúbricas</h3>

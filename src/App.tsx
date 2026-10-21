@@ -11,6 +11,7 @@ import { Notebook } from './ui/Notebook';
 import { Planner } from './ui/Planner';
 import { Reports } from './ui/Reports';
 import { Settings } from './ui/Settings';
+import { SchoolCalendar } from './ui/SchoolCalendar';
 
 const TABS = [
   ['notes', 'Cuaderno'],
@@ -21,6 +22,7 @@ const TABS = [
   ['plan', 'Planificador'],
   ['curr', 'Currículo'],
   ['config', 'Configuración'],
+  ['cal', 'Calendario escolar'],
   ['conn', 'Conexión'],
 ] as const;
 type Tab = (typeof TABS)[number][0];
@@ -62,6 +64,7 @@ export function App() {
         {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>
       {tab === 'conn' && <Settings />}
+      {tab === 'cal' && <SchoolCalendar />}
       {subject && tab === 'notes' && <Notebook key={subject.id} subject={subject} />}
       {subject && tab === 'att' && <Attendance key={subject.id} subject={subject} />}
       {subject && tab === 'comm' && <Comms key={subject.id} subject={subject} />}

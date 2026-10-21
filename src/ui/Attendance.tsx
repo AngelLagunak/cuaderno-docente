@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
-import { useGroups } from './hooks';
+import { useGroups, usePlannedSessions } from './hooks';
+import { SessionNotes } from './Calendar';
 import type { AttStatus, Attendance as Att, Student, Subject } from '../core/model';
 
 const STATUS: [AttStatus, string][] = [['P', 'Presente'], ['A', 'Ausente'], ['R', 'Retraso'], ['J', 'Justificada']];
@@ -36,6 +37,7 @@ export function Attendance({ subject }: { subject: Subject }) {
   const [slot, setSlot] = useState('1');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const planned = usePlannedSessions(group);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = (stRaw ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es'));
@@ -69,7 +71,8 @@ export function Attendance({ subject }: { subject: Subject }) {
   const sessions = [...new Set(inRange.map((r) => `${r.date}|${r.slot}`))].sort();
   const warnPct = subject.config.absenceWarnPct ?? 20;
   const annual = subject.config.annualSessions ?? 0;
-  const base = annual > 0 && !from && !to ? annual : sessions.length;
+  const yearBase = annual > 0 ? annual : planned ?? 0;
+  const base = yearBase > 0 && !from && !to ? yearBase : sessions.length;
   const counts = (s: Student) => {
     const c = { P: 0, A: 0, R: 0, J: 0 };
     for (const r of inRange) if (r.studentId === s.id) c[r.status]++;
@@ -117,6 +120,7 @@ export function Attendance({ subject }: { subject: Subject }) {
             {!sessionHeld && <button className="on" onClick={markAll}>Todos presentes</button>}
             {sessionHeld && <button className="small" onClick={delSession}>Borrar sesión</button>}
           </div>
+          <SessionNotes groupId={group.id} date={date} slot={slot} />
           {!sessionHeld && <p className="mute">Sesión sin lista. Pulsa «Todos presentes» o marca a quien falte.</p>}
           {students.map((s) => {
             const st = byKey.get(key(s))?.status ?? 'P';
@@ -142,7 +146,7 @@ export function Attendance({ subject }: { subject: Subject }) {
             <label>Hasta <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
           </div>
           <p className="mute">
-            {sessions.length} sesiones pasadas lista. Base del %: {base} {annual > 0 && !from && !to ? '(sesiones anuales previstas)' : '(sesiones pasadas lista)'}. Aviso a partir del {warnPct} % de faltas injustificadas (A).
+            {sessions.length} sesiones pasadas lista. Base del %: {base} {yearBase > 0 && !from && !to ? (annual > 0 ? '(sesiones anuales de Configuración)' : '(sesiones previstas: horario × calendario escolar)') : '(sesiones pasadas lista)'}. Aviso a partir del {warnPct} % de faltas injustificadas (A).
           </p>
           <div className="tw">
             <table className="t">
@@ -167,7 +171,7 @@ export function Attendance({ subject }: { subject: Subject }) {
             <button onClick={exportSessions} disabled={!sessions.length}>Exportar por sesión (CSV)</button>
             <button onClick={exportWeekly} disabled={!sessions.length}>Exportar resumen semanal (CSV)</button>
           </div>
-          <p className="mute">La pérdida de evaluación continua la marcas tú en Cuaderno → Final (la app solo avisa). El formato se ajustará cuando tengamos un ejemplo de exportación de SIGAD.</p>
+          <p className="mute">La pérdida de evaluación continua la marcas tú en Cuaderno → Final (la app solo avisa).</p>
         </>
       )}
     </div>

@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
+import { plannedSessions } from '../core/planning';
+import type { Group } from '../core/model';
 
 export function useGroups(subjectId: string) {
   const r = useLiveQuery(() => db.groups.where('subjectId').equals(subjectId).toArray(), [subjectId]);
@@ -10,4 +12,18 @@ export function useGroups(subjectId: string) {
 export function useNodes(subjectId: string) {
   const r = useLiveQuery(() => db.nodes.where('subjectId').equals(subjectId).sortBy('order'), [subjectId]);
   return useMemo(() => (r ?? []).filter((n) => !n.deleted), [r]);
+}
+
+/** Calendario escolar del curso del grupo (o el último guardado si no hay uno para ese curso). */
+export function useSchoolCalendar(schoolYear?: string) {
+  return useLiveQuery(async () => {
+    const all = (await db.calendars.toArray()).filter((c) => !c.deleted);
+    return all.find((c) => c.id === schoolYear) ?? all.sort((a, b) => b.id.localeCompare(a.id))[0];
+  }, [schoolYear]);
+}
+
+/** Sesiones previstas del grupo en todo el curso (horario × calendario escolar), si se pueden calcular. */
+export function usePlannedSessions(group?: Group) {
+  const cal = useSchoolCalendar(group?.schoolYear);
+  return group ? plannedSessions(cal, group.timetable ?? [], group.holidays)?.total : undefined;
 }

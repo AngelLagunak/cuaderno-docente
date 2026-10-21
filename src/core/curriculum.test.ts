@@ -83,12 +83,12 @@ describe('coverage', () => {
 
 describe('mapa de relaciones', () => {
   it('ordena los niveles en columnas según la cadena', () => {
-    expect(levelColumns(pa.subject)).toEqual([['ind', 'saber'], ['crit'], ['ce'], ['desc']]);
+    expect(levelColumns(pa.subject)).toEqual([['ind'], ['crit'], ['ce'], ['desc']]); // los saberes no se vinculan a criterios
     expect(levelColumns(mm.subject)).toEqual([['aspecto']]);
   });
-  it('la cadena de un criterio llega a sus concreciones, saberes, CE y descriptores, sin hermanos', () => {
+  it('la cadena de un criterio llega a sus concreciones, CE y descriptores, sin hermanos', () => {
     const c = chainOf('pa-1bach/crit:1.1', pa.links);
-    for (const id of ['pa-1bach/ind:1.1.1', 'pa-1bach/saber:PART.A.1', 'pa-1bach/ce:CE.PA.1', 'pa-1bach/desc:CCL1']) expect(c.has(id)).toBe(true);
+    for (const id of ['pa-1bach/ind:1.1.1', 'pa-1bach/ce:CE.PA.1', 'pa-1bach/desc:CCL1']) expect(c.has(id)).toBe(true);
     expect(c.has('pa-1bach/crit:1.2')).toBe(false); // hermano (misma CE)
     expect(c.has('pa-1bach/ind:1.2.1')).toBe(false);
   });

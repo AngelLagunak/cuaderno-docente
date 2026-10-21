@@ -32,7 +32,64 @@ function UnitForm(p: { subject: Subject; nodes: CNode[]; init: LearningUnit; onD
   );
 }
 
-function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; rubrics: Rubric[]; init: Activity; onDone: () => void }) {
+/**
+ * Enlace de una actividad planificada con su tarea de Classroom: elegir una tarea existente o crearla desde aquí
+ * (como borrador, para añadirle la rúbrica en Classroom). Después, las notas y la rúbrica se traen desde el Cuaderno.
+ */
+function ClassroomLink(p: { a: Activity; group?: Group; others: Activity[]; nodes: CNode[]; onChange: (patch: Partial<Activity>) => void }) {
+  const [list, setList] = useState<CWork[] | null>(null);
+  const [msg, setMsg] = useState('');
+  const courseId = p.group?.classroomCourseId;
+  if (!courseId) return null;
+  const taken = new Set(p.others.filter((x) => x.id !== p.a.id && !x.deleted).map((x) => x.classroomWorkId).filter(Boolean));
+  if (p.a.classroomWorkId) {
+    return (
+      <div className="row mute">
+        Vinculada con una tarea de Classroom{p.a.classroomCreated ? ' (creada desde la app)' : ''}.
+        <button className="small" onClick={() => confirm('¿Desvincular de Classroom? Las notas ya traídas se conservan.') && p.onChange({ classroomWorkId: undefined, classroomCreated: undefined })}>Desvincular</button>
+      </div>
+    );
+  }
+  async function load() {
+    setMsg('Cargando tareas…');
+    try { setList(await callScript<CWork[]>('classroom.work.list', { courseId })); setMsg(''); }
+    catch (e) { setMsg('Error: ' + (e as Error).message); }
+  }
+  async function create() {
+    if (!p.a.title.trim()) return setMsg('Pon un título antes.');
+    if (!confirm(`¿Crear «${p.a.title}» en Classroom como borrador (sobre 10)? Allí podrás añadirle la rúbrica y publicarla.`)) return;
+    setMsg('Creando en Classroom…');
+    const codes = p.a.nodeIds.map((id) => p.nodes.find((n) => n.id === id)?.code).filter(Boolean);
+    try {
+      const r = await callScript<{ id: string; maxPoints: number }>('classroom.work.create', {
+        courseId, title: p.a.title.trim(), description: codes.length ? `Criterios de evaluación: ${codes.join(', ')}` : '', dueDate: p.a.date ?? '', maxPoints: 10,
+      });
+      p.onChange({ classroomWorkId: r.id, classroomCreated: true, maxPoints: r.maxPoints });
+      setMsg('Creada en Classroom como borrador.');
+    } catch (e) { setMsg('Error: ' + (e as Error).message); }
+  }
+  return (
+    <div>
+      <div className="row">
+        <span className="mute">Classroom:</span>
+        {!list && <button className="small" onClick={load}>Vincular con una tarea</button>}
+        <button className="small" onClick={create}>Crear en Classroom</button>
+      </div>
+      {list && (
+        <select value="" onChange={(e) => {
+          const w = list.find((x) => x.id === e.target.value);
+          if (w) p.onChange({ classroomWorkId: w.id, maxPoints: w.maxPoints ?? undefined, ...(p.a.date ? {} : { date: w.dueDate || undefined }) });
+        }}>
+          <option value="">Elige la tarea de Classroom…</option>
+          {list.filter((w) => !taken.has(w.id)).map((w) => <option key={w.id} value={w.id}>{w.title}{w.state === 'DRAFT' ? ' (borrador)' : ''}{w.dueDate ? ` · ${w.dueDate}` : ''}</option>)}
+        </select>
+      )}
+      {msg && <p className="mute">{msg}</p>}
+    </div>
+  );
+}
+
+function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; others: Activity[]; init: Activity; onDone: () => void }) {
   const [a, setA] = useState(p.init);
   const [w, setW] = useState(String(p.init.weight));
   const [pick, setPick] = useState(false);
@@ -62,6 +119,15 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
       <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
       {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
       {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}
+      <ClassroomLink a={a} group={p.group} others={p.others} nodes={p.nodes} onChange={async (patch) => {
+        const next = { ...a, ...patch };
+        setA(next);
+        // El enlace se guarda al momento: la tarea ya existe en Classroom.
+        if ('classroomWorkId' in patch) {
+          const saved = await db.activities.get(a.id);
+          if (saved || next.title.trim()) await db.activities.put({ ...(saved ?? next), ...patch, updatedAt: Date.now() });
+        }
+      }} />
       <div className="row">
         <button className="on" disabled={!a.title.trim()} onClick={async () => {
           const rb = p.rubrics.find((r) => r.id === a.rubricId);
@@ -187,7 +253,7 @@ export function Planner({ subject }: { subject: Subject }) {
           </div>
           {imp && group && <WorkImport subject={subject} group={group} existing={acts} onDone={() => setImp(false)} />}
           {noItems.size > 0 && <p className="warn">⚠ {noItems.size === 1 ? '1 actividad' : `${noItems.size} actividades`} sin criterio: solo admiten nota global y no aportan al perfil competencial.</p>}
-          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} rubrics={rubrics} init={ea} onDone={() => setEa(null)} />}
+          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} rubrics={rubrics} group={group} others={acts} init={ea} onDone={() => setEa(null)} />}
           {subject.terms.map((t) => {
             const list = acts.filter((a) => a.termId === t.id);
             return (
@@ -200,7 +266,7 @@ export function Planner({ subject }: { subject: Subject }) {
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}
                         </div>
                         {noItems.has(a.id) && <div className="warn mute">⚠ Sin criterio</div>}
                         <div className="chips">

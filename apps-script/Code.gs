@@ -1,4 +1,4 @@
-// Cuaderno docente · Apps Script · ping, Classroom (lectura), correo y tablón
+// Cuaderno docente · Apps Script · ping, Classroom (tareas, notas y rúbricas), correo, tablón y sincronización
 
 function doPost(e) {
   var out;
@@ -23,6 +23,12 @@ function doPost(e) {
         break;
       case 'classroom.grades':
         out = { ok: true, data: grades_(req.courseId, req.courseWorkId) };
+        break;
+      case 'classroom.work.create':
+        out = { ok: true, data: workCreate_(req) };
+        break;
+      case 'classroom.grades.push':
+        out = { ok: true, data: gradesPush_(req) };
         break;
       case 'classroom.announce':
         out = { ok: true, data: announce_(req) };
@@ -142,6 +148,33 @@ function grades_(courseId, workId) {
   };
 }
 
+// Crea una tarea como borrador (para añadirle la rúbrica en Classroom antes de publicarla).
+function workCreate_(req) {
+  var body = { title: req.title, description: req.description || '', workType: 'ASSIGNMENT', state: 'DRAFT', maxPoints: req.maxPoints || 10 };
+  if (req.dueDate) {
+    var p = String(req.dueDate).split('-');
+    body.dueDate = { year: Number(p[0]), month: Number(p[1]), day: Number(p[2]) };
+    body.dueTime = { hours: 21, minutes: 59 }; // UTC: 23:59 en verano, 22:59 en invierno (Madrid)
+  }
+  var w = api_('/v1/courses/' + enc_(req.courseId) + '/courseWork', 'post', body);
+  return { id: w.id, maxPoints: w.maxPoints === undefined ? null : w.maxPoints };
+}
+
+// Escribe notas en borrador. Classroom solo lo permite en tareas creadas por este script y ya publicadas.
+function gradesPush_(req) {
+  var base = '/v1/courses/' + enc_(req.courseId) + '/courseWork/' + enc_(req.courseWorkId) + '/studentSubmissions';
+  var byUser = {};
+  all_(base + '?pageSize=100', 'studentSubmissions').forEach(function (s) { byUser[s.userId] = s.id; });
+  var updated = 0, errors = [];
+  (req.grades || []).forEach(function (g) {
+    var id = byUser[g.userId];
+    if (!id) { errors.push('sin entrega (¿tarea sin publicar?)'); return; }
+    try { api_(base + '/' + enc_(id) + '?updateMask=draftGrade', 'patch', { draftGrade: g.grade }); updated++; }
+    catch (e) { errors.push(String(e.message || e)); }
+  });
+  return { updated: updated, errors: errors.filter(function (x, i, a) { return a.indexOf(x) === i; }).slice(0, 5) };
+}
+
 function announce_(req) {
   var body = { text: req.text, state: 'PUBLISHED' };
   if (req.studentIds && req.studentIds.length) {
@@ -198,6 +231,14 @@ function sync_(req) {
       push[t].forEach(function (r) {
         var cur = tab[r.id];
         if (!cur || cur.updatedAt < r.updatedAt) { r._v = v; tab[r.id] = r; accepted[t + '|' + r.id] = 1; changed = true; }
+      });
+    });
+    // Los borrados de hace más de 60 días ya han llegado a todos los dispositivos: se eliminan del archivo.
+    var cutoff = Date.now() - 60 * 24 * 3600 * 1000;
+    Object.keys(db.tables).forEach(function (t) {
+      var tab = db.tables[t];
+      Object.keys(tab).forEach(function (id) {
+        if (tab[id].deleted && tab[id].updatedAt < cutoff && !accepted[t + '|' + id]) { delete tab[id]; changed = true; }
       });
     });
     if (changed) { db.version = v; file.setContent(JSON.stringify(db)); }

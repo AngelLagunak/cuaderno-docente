@@ -115,6 +115,10 @@ export interface Activity extends Stamp {
   maxPoints?: number;
   /** Rúbrica traída de Classroom (solo lectura). */
   rubric?: RubricDef;
+  /** Fila de la rúbrica de Classroom → elemento curricular que mide. */
+  classroomRubricMap?: Record<string, ID>;
+  /** La tarea de Classroom la creó la app (solo en esas se pueden escribir notas). */
+  classroomCreated?: boolean;
   /** Rúbrica propia de la app. */
   rubricId?: ID;
   date?: string;
@@ -133,6 +137,8 @@ export interface Grade extends Stamp {
   /** Nivel de la rúbrica propia (0 = primer nivel). */
   level?: number;
   value: number | null;
+  /** Último valor traído de Classroom: si `value` sigue igual, Classroom puede actualizarla sin preguntar. */
+  cls?: number | null;
   /** Recuperación: nota anterior (la que cuenta es `value`) y fecha AAAA-MM-DD. */
   prev?: number | null;
   recoveredAt?: string;

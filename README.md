@@ -91,3 +91,18 @@ En **Cuaderno → Por actividad**:
 - **∅**: entrega vacía o archivo corrupto, vale 0.
 
 Todo es configurable por materia en Configuración. La exportación CSV incluye Ordinaria, Vía y Oficial.
+
+## Classroom: planificar aquí, traer notas y rúbricas de allí (Fase 13)
+1. **Planificador**: crea la actividad con sus criterios aunque aún no exista en Classroom (aparece «sin tarea en Classroom»).
+2. Al editarla: **Vincular con una tarea** (elige una tarea existente) o **Crear en Classroom** (se crea como borrador, sobre 10, con los criterios en la descripción). Añádele la rúbrica en Classroom y publícala.
+3. **Cuaderno**: las notas y rúbricas de las tareas vinculadas se traen solas al abrirlo (como mucho cada 30 min) y con **Classroom ⟳**. En **Por actividad**, «Traer notas de Classroom» solo para esa tarea.
+4. **Rúbrica de Classroom → criterios**: cada fila se empareja con un criterio (sola si el título empieza por el código, «3.2 …»). Los puntos de cada fila pasan a ser la nota de ese criterio (sobre 10).
+5. Si Classroom cambia una nota, se actualiza aquí. Si la habías cambiado en la app, no se pisa: la app pregunta.
+6. En tareas creadas desde la app: **Enviar notas a Classroom (borrador)** cuando ya estén publicadas.
+
+**Hay que actualizar el Apps Script** (nuevo permiso para crear tareas y escribir notas):
+1. Pega el nuevo `apps-script/Code.gs` y el nuevo `appsscript.json`. Guarda.
+2. Ejecuta `autorizar` y acepta los permisos nuevos.
+3. Implementar → Gestionar implementaciones → lápiz → Versión: **Nueva versión** → Implementar (la URL no cambia).
+
+El servidor también elimina de `cuaderno-docente-db.json` los borrados de hace más de 60 días.

@@ -1,8 +1,9 @@
 import Dexie, { type Table } from 'dexie';
 import { linkId } from '../core/model';
-import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, SchoolCalendar, Session, Stamp, Student, Subject } from '../core/model';
+import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, SchoolCalendar, Session, Snapshot, Stamp, Student, Subject } from '../core/model';
 import { catalogs } from '../catalogs';
 import { migrateSubject, refreshedCatalogNodes } from '../core/curriculum';
+import { restoreChanges, takeSnapshot } from '../core/versions';
 
 class DB extends Dexie {
   subjects!: Table<Subject, string>;
@@ -19,6 +20,7 @@ class DB extends Dexie {
   rubrics!: Table<Rubric, string>;
   sessions!: Table<Session, string>;
   calendars!: Table<SchoolCalendar, string>;
+  snapshots!: Table<Snapshot, string>;
 
   constructor() {
     super('cuaderno-docente');
@@ -40,6 +42,8 @@ class DB extends Dexie {
     this.version(6).stores({ sessions: 'id, groupId, date' });
     // v7: calendario escolar común (festivos y evaluaciones del curso).
     this.version(7).stores({ calendars: 'id' });
+    // v8: versiones guardadas de la programación de cada materia.
+    this.version(8).stores({ snapshots: 'id, subjectId' });
   }
 }
 
@@ -199,4 +203,29 @@ export async function saveRubric(r: Rubric) {
       .map(({ g, v }) => ({ ...g, value: v, level: v == null ? undefined : g.level, updatedAt: now }));
     if (upd.length) await db.grades.bulkPut(upd);
   });
+}
+
+/** Programación actual de la materia (para guardar una versión o compararla). */
+export async function currentSnapshot(subjectId: string) {
+  const subject = await db.subjects.get(subjectId);
+  if (!subject) throw new Error('Materia no encontrada.');
+  const by = <T>(t: Table<T, string>) => t.where('subjectId').equals(subjectId).toArray();
+  return takeSnapshot(subject, await by(db.nodes), await by(db.links), await by(db.units), await by(db.rubrics));
+}
+
+/** Vuelve a una versión guardada. Antes guarda la programación actual como versión, por si acaso. */
+export async function restoreSnapshot(snap: Snapshot) {
+  const cur = await currentSnapshot(snap.subjectId);
+  const now = Date.now();
+  await db.snapshots.put({ id: uid(), subjectId: snap.subjectId, name: `Antes de volver a «${snap.name}»`, createdAt: now, data: cur, updatedAt: now });
+  const r = restoreChanges(snap.data, cur, now);
+  await db.transaction('rw', [db.subjects, db.nodes, db.links, db.units, db.rubrics], async () => {
+    await db.subjects.put(r.subject);
+    await db.nodes.bulkPut(r.nodes);
+    await db.links.bulkPut(r.links);
+    await db.units.bulkPut(r.units);
+    await db.rubrics.bulkPut(r.rubrics);
+  });
+  for (const n of r.removedNodes) await deleteNode(n);
+  return r;
 }

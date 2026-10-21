@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
 import { useGroups, usePlannedSessions } from './hooks';
@@ -67,6 +67,22 @@ export function Attendance({ subject }: { subject: Subject }) {
     const missing = students.filter((x) => !byKey.has(key(x)) && x.id !== s.id).map((x) => mk(x, 'P', now));
     await db.attendance.bulkPut([...missing, mk(s, st, now)]);
   }
+  // Pase de lista con tarjetas: un alumno cada vez, en orden; al terminar, la lista para corregir.
+  const [mode, setMode] = useState<'auto' | 'cards' | 'list'>('auto');
+  const [ci, setCi] = useState<number | null>(null);
+  useEffect(() => { setMode('auto'); setCi(null); }, [date, slot, group?.id]);
+  const firstOpen = students.findIndex((s) => !byKey.has(key(s)));
+  const cardsOn = mode === 'cards' || (mode === 'auto' && firstOpen >= 0);
+  const idx = Math.min(ci ?? (firstOpen >= 0 ? firstOpen : 0), students.length - 1);
+  async function cardMark(st: AttStatus) {
+    const s = students[idx];
+    const now = Date.now();
+    await db.attendance.put(mk(s, st, now));
+    if (idx + 1 < students.length) return setCi(idx + 1);
+    // Último: quien no se haya marcado (saltado) queda presente y se pasa a la lista.
+    await db.attendance.bulkPut(students.filter((x) => x.id !== s.id && !byKey.has(key(x))).map((x) => mk(x, 'P', now)));
+    setCi(null); setMode('list');
+  }
   async function markAll() {
     const now = Date.now();
     await db.attendance.bulkPut(students.filter((s) => !byKey.has(key(s))).map((s) => mk(s, 'P', now)));
@@ -133,8 +149,33 @@ export function Attendance({ subject }: { subject: Subject }) {
             <label><input type="checkbox" style={{ width: 'auto' }} checked={showObs} onChange={(e) => setShowObs(e.target.checked)} /> Observaciones</label>
           </div>
           <SessionNotes groupId={group.id} date={date} slot={slot} />
-          {!sessionHeld && <p className="mute">Sesión sin lista. Pulsa «Todos presentes» o marca a quien falte.</p>}
-          {students.map((s) => {
+          {cardsOn && (() => {
+            const s = students[idx];
+            const rec = byKey.get(key(s));
+            return (
+              <div className="rollcard">
+                <div className="mute">{idx + 1} de {students.length}</div>
+                <div className="rollname">{s.firstName}<b>{s.lastName}</b></div>
+                <div className="mute">{rec ? `Marcado: ${STATUS.find(([k]) => k === rec.status)?.[1]}` : '\u00a0'}</div>
+                <div className="rollbtns">
+                  <button className="on big" onClick={() => cardMark('P')}>Ha venido</button>
+                  <button className="big no" onClick={() => cardMark('A')}>No ha venido</button>
+                </div>
+                <div className="row center">
+                  <button className="small" disabled={idx === 0} onClick={() => setCi(idx - 1)}>‹ Anterior</button>
+                  <button className="small" onClick={() => cardMark('R')}>Retraso</button>
+                  <button className="small" disabled={idx + 1 >= students.length} onClick={() => setCi(idx + 1)}>Saltar ›</button>
+                </div>
+                <div className="row center">
+                  <button className="small" onClick={async () => { await markAll(); setMode('list'); }}>Resto presentes</button>
+                  <button className="small" onClick={() => setMode('list')}>Ver lista</button>
+                </div>
+              </div>
+            );
+          })()}
+          {!cardsOn && sessionHeld && <div className="row"><span className="mute">Lista pasada. Corrige aquí retrasos y justificantes.</span><button className="small" onClick={() => { setCi(0); setMode('cards'); }}>Repasar con tarjetas</button></div>}
+          {!cardsOn && !sessionHeld && <div className="row"><span className="mute">Sesión sin lista.</span><button className="small on" onClick={() => { setCi(null); setMode('auto'); }}>Pasar lista con tarjetas</button></div>}
+          {!cardsOn && students.map((s) => {
             const st = byKey.get(key(s))?.status ?? 'P';
             const obs = byKey.get(key(s))?.obs ?? [];
             return (
@@ -159,7 +200,7 @@ export function Attendance({ subject }: { subject: Subject }) {
               </div>
             );
           })}
-          <p className="mute">P presente · A ausente · R retraso · J falta justificada{showObs ? '. Las observaciones (+ / −) se usan en las actividades de dinámica del aula marcadas «Nota desde las observaciones».' : ''}</p>
+          {!cardsOn && <p className="mute">P presente · A ausente · R retraso · J falta justificada{showObs ? '. Las observaciones (+ / −) se usan en las actividades de dinámica del aula marcadas «Nota desde las observaciones».' : ''}</p>}
         </div>
       )}
 

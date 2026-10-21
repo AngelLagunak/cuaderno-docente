@@ -118,3 +118,40 @@ export function importChanges(plan: ImportPlan, table: CellIn[][], current: (stu
 export function shouldPurge(r: Stamp, now: number, pushedAt: number): boolean {
   return !!r.deleted && r.updatedAt < now - 60 * 24 * 3600 * 1000 && r.updatedAt <= pushedAt;
 }
+
+type Row = Stamp & { id: string };
+export interface Backup { exportedAt: string | null; tables: Record<string, Row[]> }
+
+/** Lee una copia: la exportación de la app o el db.json de Drive (tablas como objetos id → registro). */
+export function parseBackup(text: string): Backup {
+  let j: { app?: string; exportedAt?: string; tables?: Record<string, Row[] | Record<string, Row>> };
+  try { j = JSON.parse(text); } catch { throw new Error('El archivo no es una copia de la app (JSON no válido).'); }
+  if (!j || typeof j !== 'object' || !j.tables || typeof j.tables !== 'object') throw new Error('El archivo no es una copia de la app.');
+  const tables: Record<string, Row[]> = {};
+  for (const [t, v] of Object.entries(j.tables)) tables[t] = (Array.isArray(v) ? v : Object.values(v)).filter((r) => r && typeof r.id === 'string').map((r) => { const c = { ...r } as Row & { _v?: number }; delete c._v; return c; });
+  return { exportedAt: j.exportedAt ?? null, tables };
+}
+
+/**
+ * Registros que hay que guardar para restaurar una copia.
+ * - «combinar»: entra lo de la copia que sea más reciente que lo del dispositivo (no se pierde nada nuevo).
+ * - «volver a la copia»: todo queda como en la copia; lo creado después se borra. Con fecha actual, para que
+ *   la sincronización lo lleve también a los demás dispositivos.
+ */
+export function restorePlan(current: Record<string, Row[]>, backup: Record<string, Row[]>, mode: 'merge' | 'replace', now: number) {
+  const out: Record<string, Row[]> = {};
+  for (const t of Object.keys(current)) {
+    const cur = new Map(current[t].map((r) => [r.id, r]));
+    const bk = backup[t] ?? [];
+    if (mode === 'merge') out[t] = bk.filter((r) => !cur.has(r.id) || cur.get(r.id)!.updatedAt < r.updatedAt);
+    else {
+      const ids = new Set(bk.map((r) => r.id));
+      out[t] = [
+        ...bk.map((r) => ({ ...r, deleted: !!r.deleted, updatedAt: now })),
+        ...current[t].filter((r) => !r.deleted && !ids.has(r.id)).map((r) => ({ ...r, deleted: true, updatedAt: now })),
+      ];
+    }
+    if (!out[t].length) delete out[t];
+  }
+  return out;
+}

@@ -137,3 +137,9 @@ En **Currículo**:
 - **Actividad «Nota desde las observaciones del aula»** (Planificador): en Cuaderno → Por actividad propone la nota con las marcas de las fechas de su evaluación (Calendario escolar): base 6 ± 0,5 por marca, entre 0 y 10. «Aplicar propuesta» la pone (se puede deshacer). Para que cuente en Proyectos Artísticos, la actividad necesita criterios (p. ej. 3.1).
 - **+ Asignatura**: plantilla LOMLOE (competencias específicas, criterios, descriptores y saberes), FP (resultados de aprendizaje y criterios), copia de instrumentos y cálculo de otra asignatura, o vacía. **Currículo → Cargar el currículo con una IA**: prompt para copiar y su respuesta (JSON) se añade a la asignatura; los descriptores de Bachillerato usan la redacción oficial.
 - **Configuración → Borrar asignatura** (si no tiene grupos).
+
+## Pase de lista con tarjetas, objetivos, versiones y copias (Fase 19)
+- **Asistencia → Pasar lista**: si la sesión no tiene lista, aparece un alumno cada vez, en orden: «Ha venido» / «No ha venido» (o Retraso) y pasa al siguiente. Se puede volver atrás, saltar o marcar «Resto presentes». Al terminar se ve la lista para corregir retrasos y justificantes; «Repasar con tarjetas» vuelve a empezar.
+- **Currículo → Objetivos**: objetivos de etapa (se pegan del BOA, con un prompt para pedírselos a una IA, o se copian de otra asignatura) y qué competencias específicas contribuyen a cada uno. No cuentan para la nota.
+- **Currículo → Versiones**: guardar la programación («Programación 2026/27»: configuración, currículo, vínculos, unidades y rúbricas, sin alumnado ni notas), ver qué ha cambiado desde entonces, volver a ella (antes se guarda la actual) o descargarla.
+- **Conexión → Copia de seguridad en un archivo**: descargar, aviso si hace más de 14 días de la última, y restaurar con vista previa: «Combinar» (no pierde nada posterior) o «Volver a la copia». Sirve también el `cuaderno-docente-db.json` de Drive.

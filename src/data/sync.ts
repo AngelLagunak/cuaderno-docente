@@ -3,9 +3,10 @@ import type { Table } from 'dexie';
 import { db } from './db';
 import { callScript } from './api';
 import type { Stamp } from '../core/model';
-import { shouldPurge } from '../core/io';
+import { restorePlan, shouldPurge } from '../core/io';
+import type { Backup } from '../core/io';
 
-const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics', 'sessions', 'calendars'];
+const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics', 'sessions', 'calendars', 'snapshots'];
 type Rec = Stamp & { id: string; _v?: number };
 const tab = (t: string) => (db as unknown as Record<string, Table<Rec, string>>)[t];
 
@@ -104,15 +105,19 @@ export async function exportAll() {
   a.href = URL.createObjectURL(blob);
   a.download = `cuaderno-docente-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
+  localStorage.setItem('lastBackup', String(Date.now()));
 }
 
-/** Importa un export o un db.json de copia de seguridad (se fusiona; gana lo más reciente). */
-export async function importAll(text: string) {
-  const j = JSON.parse(text) as { tables?: Record<string, Rec[] | Record<string, Rec>> };
-  if (!j.tables) throw new Error('Archivo no válido.');
-  const pull: Record<string, Rec[]> = {};
-  for (const [t, v] of Object.entries(j.tables)) pull[t] = Array.isArray(v) ? v : Object.values(v);
-  return applyRemote(pull);
+/** Restaura una copia (exportación o db.json de Drive): combinar o volver a ella. Devuelve los registros guardados. */
+export async function restoreBackup(backup: Backup, mode: 'merge' | 'replace') {
+  const current: Record<string, Rec[]> = {};
+  for (const t of TABLES) current[t] = await tab(t).toArray();
+  const plan = restorePlan(current, backup.tables, mode, Date.now());
+  let n = 0;
+  await db.transaction('rw', TABLES.map(tab), async () => {
+    for (const [t, rows] of Object.entries(plan)) { await tab(t).bulkPut(rows); n += rows.length; }
+  });
+  return n;
 }
 
 export function startAutoSync() {

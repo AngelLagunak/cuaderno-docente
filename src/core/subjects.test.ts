@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copyStructure, curriculumRecords, newSubject, parseCurriculum } from './subjects';
+import { copyStructure, curriculumRecords, newSubject, objectivesRecords, parseCurriculum, parseObjectives } from './subjects';
 import { review } from './curriculum';
 import { pa } from '../catalogs/pa';
 
@@ -45,5 +45,23 @@ describe('asignaturas nuevas', () => {
     expect(() => parseCurriculum('No lo encuentro')).toThrow(/JSON/);
     expect(() => parseCurriculum('{"a": 1}')).toThrow(/competencias/);
     expect(() => parseCurriculum('{"competencias": [}')).toThrow(/no es válido/);
+  });
+});
+
+describe('objetivos de etapa', () => {
+  it('lee la lista pegada y añade nivel, relación y objetivos sin duplicar', () => {
+    const items = parseObjectives('```\n**a)** Ejercer la ciudadanía democrática,\ndesde una perspectiva global.\nb) Consolidar una madurez personal.\n- ñ) Fomentar una actitud responsable.\n# Fuente: BOA\n```');
+    expect(items).toEqual([
+      { code: 'a', text: 'Ejercer la ciudadanía democrática, desde una perspectiva global.' },
+      { code: 'b', text: 'Consolidar una madurez personal.' },
+      { code: 'ñ', text: 'Fomentar una actitud responsable.' },
+    ]);
+    const r = objectivesRecords(pa.subject, items, pa.nodes);
+    expect(r.subject.levels[r.subject.levels.length - 1]).toMatchObject({ key: 'obj', plural: 'Objetivos de etapa' });
+    expect(r.subject.relations[r.subject.relations.length - 1]).toMatchObject({ key: 'ce-obj', from: 'ce', to: 'obj' });
+    expect(r.nodes.map((n) => n.id)).toEqual(['pa-1bach/obj:a', 'pa-1bach/obj:b', 'pa-1bach/obj:ñ']);
+    const again = objectivesRecords(r.subject, items, [...pa.nodes, ...r.nodes]);
+    expect(again.nodes).toEqual([]);
+    expect(again.subject.relations).toHaveLength(r.subject.relations.length);
   });
 });

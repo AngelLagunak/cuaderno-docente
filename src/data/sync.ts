@@ -3,6 +3,7 @@ import type { Table } from 'dexie';
 import { db } from './db';
 import { callScript } from './api';
 import type { Stamp } from '../core/model';
+import { shouldPurge } from '../core/io';
 
 const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics'];
 type Rec = Stamp & { id: string; _v?: number };
@@ -81,6 +82,18 @@ export async function syncNow() {
   } finally {
     running = false;
   }
+}
+
+/** Elimina del dispositivo los borrados de hace más de 60 días que ya se enviaron al servidor. */
+export async function purgeDeleted() {
+  const now = Date.now();
+  const pushedAt = configured() ? num('syncPushAt') : now;
+  let n = 0;
+  for (const t of TABLES) {
+    const ids = await tab(t).filter((r) => shouldPurge(r, now, pushedAt)).primaryKeys();
+    if (ids.length) { await tab(t).bulkDelete(ids); n += ids.length; }
+  }
+  return n;
 }
 
 export async function exportAll() {

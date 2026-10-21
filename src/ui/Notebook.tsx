@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { ImportGrades } from './ImportGrades';
 import { Cell, RecMark, fmt, parse, raw } from './cells';
 import { FinalView } from './FinalView';
 import { canImprove, outcome, scaleLabel } from '../core/rules';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, saveGrade, saveItemGrade } from '../data/db';
+import { db, lastUndo, saveGrade, saveItemGrade, subscribeUndo, undo, undoable } from '../data/db';
 import { configured } from '../data/sync';
 import { applyPending, describe, pullActivity, pullGroup } from '../data/classroomSync';
 import type { PullResult } from '../data/classroomSync';
 import { PushGrades, RubricMap } from './ClassroomPanel';
 import { useGroups, useNodes } from './hooks';
-import { activityBase, activityValue, indexGrades, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
+import { activityBase, activityValue, indexGrades, profile, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
 import type { Num, StudentGrades } from '../core/evaluation';
 import { gradedLevels } from '../core/curriculum';
 import type { Activity, CNode, Grade, Rubric, Student, Subject } from '../core/model';
@@ -67,6 +68,8 @@ export function Notebook({ subject }: { subject: Subject }) {
   const [actId, setActId] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [imp, setImp] = useState(false);
+  const undoLabel = useSyncExternalStore(subscribeUndo, lastUndo);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = (stRaw ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es'));
@@ -88,26 +91,49 @@ export function Notebook({ subject }: { subject: Subject }) {
   const rubricOf = (a: Activity) => (a.rubricId ? (rbRaw ?? []).find((r) => r.id === a.rubricId && !r.deleted) : undefined);
   const instName = (id: string) => subject.instruments.find((i) => i.id === id)?.name ?? '?';
 
-  function exportCsv() {
-    const q = (x: string) => `"${x.replace(/"/g, '""')}"`;
-    const head = ['Apellidos', 'Nombre', ...acts.map((a) => `${a.title} (${subject.terms.find((t) => t.id === a.termId)?.name})`), ...subject.terms.map((t) => t.name), 'Ordinaria', 'Vía', 'Oficial', ...(cfg.scale === 'ssapntsb' ? ['Calificación'] : [])];
-    const lines = students.map((s) => {
+  /** Tabla de notas para exportar (números sin redondear a texto). */
+  function gradeTable(): (string | number | null)[][] {
+    const head = ['Apellidos', 'Nombre', 'NIA', ...acts.map((a) => `${a.title} (${subject.terms.find((t) => t.id === a.termId)?.name})`), ...subject.terms.map((t) => t.name), 'Ordinaria', 'Vía', 'Oficial', ...(cfg.scale === 'ssapntsb' ? ['Calificación'] : [])];
+    return [head, ...students.map((s) => {
       const m = sgOf(s);
       const o = outcome(subject, acts, m, curr, s);
       const f = o.ordinary;
-      return [s.lastName, s.firstName,
-        ...acts.map((a) => raw(round(activityBase(a, m), 2))),
-        ...f.terms.map((t) => fmt(round(t.result.value, cfg.termDecimals), cfg.termDecimals)),
-        fmt(f.rounded, cfg.finalDecimals), o.source, fmt(o.official, cfg.finalDecimals),
-        ...(cfg.scale === 'ssapntsb' ? [scaleLabel(subject, o.official)] : [])].map((x) => q(String(x))).join(';');
-    });
-    const blob = new Blob(['\ufeff' + [head.map(q).join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      return [s.lastName, s.firstName, s.nia ?? '',
+        ...acts.map((a) => round(activityBase(a, m), 2)),
+        ...f.terms.map((t) => round(t.result.value, cfg.termDecimals)),
+        f.rounded, o.source, o.official,
+        ...(cfg.scale === 'ssapntsb' ? [scaleLabel(subject, o.official)] : [])];
+    })];
+  }
+  /** Perfil de todo el curso: criterios y competencias específicas (o el nivel del que sale la nota). */
+  function criteriaTable(): (string | number | null)[][] {
+    const graded = gradedLevels(subject);
+    const cols = nodes.filter((n) => graded.has(n.level) || n.level === gl);
+    return [['Apellidos', 'Nombre', ...cols.map((n) => n.code)], ...students.map((s) => {
+      const pr = profile(subject, nodes, curr.links, acts, sgOf(s));
+      return [s.lastName, s.firstName, ...cols.map((n) => round(pr.nodes.get(n.id) ?? null, 2))];
+    })];
+  }
+  function download(name: string, blob: Blob) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `notas-${group?.name ?? 'grupo'}.csv`;
+    a.download = name;
     a.click();
   }
-
+  function exportCsv() {
+    const q = (x: string | number | null) => `"${(typeof x === 'number' ? String(x).replace('.', ',') : x ?? '').replace(/"/g, '""')}"`;
+    const csv = gradeTable().map((r) => r.map(q).join(';')).join('\r\n');
+    download(`notas-${group?.name ?? 'grupo'}.csv`, new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+  }
+  async function exportXlsx() {
+    const { default: writeXlsxFile } = await import('write-excel-file/browser');
+    const bold = (t: (string | number | null)[][]) => t.map((r, i) => (i === 0 ? r.map((v) => ({ value: v ?? '', fontWeight: 'bold' as const })) : r));
+    const blob = await writeXlsxFile([
+      { sheet: 'Notas', data: bold(gradeTable()), stickyRowsCount: 1 },
+      { sheet: 'Criterios', data: bold(criteriaTable()), stickyRowsCount: 1 },
+    ]).toBlob();
+    download(`notas-${group?.name ?? 'grupo'}.xlsx`, blob);
+  }
 
   /** Pregunta si sobrescribir las notas cambiadas en la app y muestra el resumen. */
   async function finish(r: PullResult, extra = '') {
@@ -120,7 +146,7 @@ export function Notebook({ subject }: { subject: Subject }) {
   async function pullGrades() {
     if (!act || !group) return;
     setBusy(true); setMsg('Consultando Classroom…');
-    try { await finish(await pullActivity(subject, act, group)); }
+    try { await undoable('notas de Classroom', async () => finish(await pullActivity(subject, act, group))); }
     catch (e) { setMsg('Error: ' + (e as Error).message); }
     finally { setBusy(false); }
   }
@@ -128,11 +154,11 @@ export function Notebook({ subject }: { subject: Subject }) {
     if (!group?.classroomCourseId) return;
     if (!silent) { setBusy(true); setMsg('Consultando Classroom…'); }
     try {
-      const r = await pullGroup(subject, group, acts);
+      const r = await undoable('notas de Classroom', () => pullGroup(subject, group, acts));
       localStorage.setItem('clsPull:' + group.id, String(Date.now()));
       if (silent) {
         if (r.applied || r.conflicts.length) setMsg(describe(r, ` (${r.count} tareas)`) + (r.conflicts.length ? '. Pulsa «Classroom ⟳» para revisarlas.' : ''));
-      } else await finish(r, ` (${r.count} tareas)`);
+      } else await undoable('notas de Classroom', () => finish(r, ` (${r.count} tareas)`));
     } catch (e) {
       if (!silent) setMsg('Error: ' + (e as Error).message);
     } finally {
@@ -179,16 +205,17 @@ export function Notebook({ subject }: { subject: Subject }) {
       if (v == null) return alert('Nota no válida (0–10).');
       patch = { value: v, level: undefined, prev, recoveredAt };
     }
-    if (node) await saveItemGrade(s.id, a.id, node.id, patch);
-    else await saveGrade(s.id, a.id, patch);
+    await undoable('recuperación', () => (node ? saveItemGrade(s.id, a.id, node.id, patch) : saveGrade(s.id, a.id, patch)));
   }
 
   /** Entrega vacía o archivo corrupto: vale 0 (en todos sus criterios si se califica por criterio). */
   async function emptyDelivery(s: Student, a: Activity) {
     if (!confirm(`¿Entrega vacía o archivo corrupto de ${s.firstName} en «${a.title}»? Se calificará con 0.`)) return;
     const its = actItems(a);
-    if (its.length && items) for (const n of its) await saveItemGrade(s.id, a.id, n.id, { value: 0, level: undefined });
-    await saveGrade(s.id, a.id, { ...(its.length && items ? {} : { value: 0 }), comment: 'Entrega vacía o archivo corrupto' });
+    await undoable('entrega vacía', async () => {
+      if (its.length && items) for (const n of its) await saveItemGrade(s.id, a.id, n.id, { value: 0, level: undefined });
+      await saveGrade(s.id, a.id, { ...(its.length && items ? {} : { value: 0 }), comment: 'Entrega vacía o archivo corrupto' });
+    });
   }
 
   return (
@@ -201,10 +228,14 @@ export function Notebook({ subject }: { subject: Subject }) {
         <button className={view === 'act' ? 'on' : ''} onClick={() => setView('act')}>Por actividad</button>
         <button className={view === 'final' ? 'on' : ''} onClick={() => setView('final')}>Final</button>
         <button className="small" onClick={exportCsv}>Exportar CSV</button>
+        <button className="small" onClick={exportXlsx}>Exportar Excel</button>
+        <button className="small" onClick={() => setImp(!imp)}>Importar notas</button>
+        {undoLabel && <button className="small" onClick={async () => setMsg(`Deshecho: ${await undo()}.`)} title="Deshace el último cambio de notas de esta sesión">↶ Deshacer {undoLabel}</button>}
         {group.classroomCourseId && linked > 0 && <button className="small" disabled={busy} onClick={() => pullAll()} title="Traer notas y rúbricas de todas las tareas vinculadas">Classroom ⟳</button>}
       </div>
 
       {msg && <p className="mute">{msg}</p>}
+      {imp && <ImportGrades subject={subject} students={students} acts={acts} sgOf={sgOf} onDone={(m) => { setImp(false); if (m) setMsg(m); }} />}
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}
       {students.length > 0 && acts.length === 0 && <p className="mute">Crea actividades en el Planificador.</p>}
 

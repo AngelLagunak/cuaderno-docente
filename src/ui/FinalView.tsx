@@ -1,11 +1,10 @@
-import { db } from '../data/db';
+import { saveStudent } from '../data/db';
 import { round } from '../core/evaluation';
 import type { Curr, StudentGrades } from '../core/evaluation';
 import { absenceSummary, outcome, scaleLabel } from '../core/rules';
 import type { Activity, Attendance, Student, Subject } from '../core/model';
 import { Cell, fmt } from './cells';
 
-const saveStudent = (s: Student, patch: Partial<Student>) => db.students.put({ ...s, ...patch, updatedAt: Date.now() });
 const SRC = { ordinaria: '', 'pérdida de evaluación continua': 'PEC', extraordinaria: 'Extr.' } as const;
 
 /**

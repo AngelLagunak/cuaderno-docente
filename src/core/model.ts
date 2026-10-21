@@ -256,3 +256,16 @@ export interface Message extends Stamp {
 }
 
 export interface Template extends Stamp { id: ID; name: string; subject: string; body: string }
+
+/**
+ * Versión guardada de la programación de una materia: estructura, configuración, currículo, vínculos, unidades y
+ * rúbricas (sin alumnado ni notas).
+ */
+export interface Snapshot extends Stamp {
+  id: ID;
+  subjectId: ID;
+  name: string;
+  createdAt: number;
+  data: SnapshotData;
+}
+export interface SnapshotData { subject: Subject; nodes: CNode[]; links: CLink[]; units: LearningUnit[]; rubrics: Rubric[] }

@@ -1,6 +1,8 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { CurriculumMatrix } from './CurriculumMatrix';
 import { CurriculumAI } from './CurriculumAI';
+import { Versions } from './Versions';
+import { Objectives } from './Objectives';
 
 const CurriculumMap = lazy(() => import('./CurriculumMap'));
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -51,7 +53,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   const [levelKey, setLevelKey] = useState(subject.levels[0]?.key ?? '');
-  const [view, setView] = useState<'cards' | 'matrix' | 'map' | 'review'>('cards');
+  const [view, setView] = useState<'cards' | 'matrix' | 'map' | 'review' | 'obj' | 'versions'>('cards');
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -120,9 +122,15 @@ export function Curriculum({ subject }: { subject: Subject }) {
         <button className={view === 'review' ? 'on' : ''} onClick={() => setView('review')}>
           Revisión{issues.length ? ` (${issues.length})` : ''}
         </button>
+        <button className={view === 'obj' ? 'on' : ''} onClick={() => setView('obj')}>Objetivos</button>
+        <button className={view === 'versions' ? 'on' : ''} onClick={() => setView('versions')}>Versiones</button>
       </div>
 
-      {view === 'matrix' ? (
+      {view === 'obj' ? (
+        <Objectives subject={subject} nodes={nodes} links={links} />
+      ) : view === 'versions' ? (
+        <Versions subject={subject} />
+      ) : view === 'matrix' ? (
         <CurriculumMatrix subject={subject} nodes={nodes} links={links} />
       ) : view === 'map' ? (
         <Suspense fallback={<p className="mute">Cargando mapa…</p>}><CurriculumMap subject={subject} nodes={nodes} links={allLinks ?? []} /></Suspense>

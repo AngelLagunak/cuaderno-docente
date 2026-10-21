@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellValue, importChanges, parseCsv, planImport, shouldPurge } from './io';
+import { cellValue, importChanges, parseBackup, parseCsv, planImport, restorePlan, shouldPurge } from './io';
 import type { Activity, Grade, Student } from './model';
 import { pa } from '../catalogs/pa';
 
@@ -71,5 +71,25 @@ describe('shouldPurge', () => {
     expect(shouldPurge({ deleted: true, updatedAt: now - 59 * day }, now, now)).toBe(false);
     expect(shouldPurge({ updatedAt: now - 99 * day }, now, now)).toBe(false);
     expect(shouldPurge({ deleted: true, updatedAt: now - 61 * day }, now, now - 62 * day)).toBe(false); // aún sin enviar
+  });
+});
+
+describe('copias de seguridad', () => {
+  const r = (id: string, updatedAt: number, deleted?: boolean) => ({ id, updatedAt, ...(deleted ? { deleted } : {}) });
+  it('lee la exportación de la app y el db.json de Drive', () => {
+    expect(parseBackup('{"app":"cuaderno-docente","exportedAt":"2026-10-21","tables":{"grades":[{"id":"a","updatedAt":1}]}}')).toEqual({ exportedAt: '2026-10-21', tables: { grades: [r('a', 1)] } });
+    expect(parseBackup('{"version":3,"tables":{"grades":{"a":{"id":"a","updatedAt":1,"_v":3}}}}').tables.grades).toEqual([r('a', 1)]);
+    expect(() => parseBackup('hola')).toThrow(/no es una copia/);
+    expect(() => parseBackup('{"a":1}')).toThrow(/no es una copia/);
+  });
+  it('combinar: solo entra lo más reciente de la copia', () => {
+    const cur = { grades: [r('a', 5), r('b', 1), r('c', 9)], students: [] };
+    const bk = { grades: [r('a', 3), r('b', 4), r('d', 2)], students: [] };
+    expect(restorePlan(cur, bk, 'merge', 100)).toEqual({ grades: [r('b', 4), r('d', 2)] });
+  });
+  it('volver a la copia: todo como en la copia y lo nuevo, borrado', () => {
+    const cur = { grades: [r('a', 5), r('c', 9), r('x', 1, true)] };
+    const bk = { grades: [r('a', 3), r('d', 2, true)] };
+    expect(restorePlan(cur, bk, 'replace', 100)).toEqual({ grades: [{ ...r('a', 100), deleted: false }, r('d', 100, true), r('c', 100, true)] });
   });
 });

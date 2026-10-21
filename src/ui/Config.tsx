@@ -84,6 +84,7 @@ export function Config({ subject }: { subject: Subject }) {
         <label>Nota de aprobado <input className="num" type="number" step="0.5" value={d.config.passMark} onChange={(e) => cfg({ passMark: num(e.target.value, 5) })} /></label>
         <label>Decimales en evaluaciones <input className="num" type="number" min={0} max={3} value={d.config.termDecimals} onChange={(e) => cfg({ termDecimals: num(e.target.value) })} /></label>
         <label>Decimales en la nota final <input className="num" type="number" min={0} max={3} value={d.config.finalDecimals} onChange={(e) => cfg({ finalDecimals: num(e.target.value) })} /></label>
+        <label>Nota final mínima (SIGAD no admite 0) <input className="num" type="number" min={0} max={10} value={d.config.minGrade ?? 1} onChange={(e) => cfg({ minGrade: num(e.target.value, 1) })} /></label>
         <label><input type="checkbox" style={{ width: 'auto' }} checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Cada instrumento debe llegar al aprobado</label>
         <label>Penalización por entrega tardía (%) <input className="num" type="number" min={0} max={100} value={d.config.latePenaltyPct} onChange={(e) => cfg({ latePenaltyPct: num(e.target.value) })} /></label>
         <label>Aviso de faltas injustificadas (%) <input className="num" type="number" min={0} max={100} value={d.config.absenceWarnPct ?? 20} onChange={(e) => cfg({ absenceWarnPct: num(e.target.value, 20) })} /></label>

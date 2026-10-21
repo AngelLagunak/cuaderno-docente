@@ -30,6 +30,8 @@ export interface SubjectConfig {
   passMark: number;
   termDecimals: number;
   finalDecimals: number;
+  /** Nota final mínima tras redondear (SIGAD no admite 0). Por defecto 1. */
+  minGrade?: number;
   /** Si true, una nota < passMark en algún instrumento marca la evaluación como no superada. */
   minPerInstrument: boolean;
   /** % de penalización por entrega tardía (0 = no se usa). */

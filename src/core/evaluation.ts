@@ -86,9 +86,10 @@ export function finalResult(
   const value = wmean(terms.map((t): [Num, number] => [t.result.value, t.weight]));
   const total = terms.reduce((s, t) => s + t.weight, 0);
   const covered = terms.reduce((s, t) => s + (t.result.value != null ? t.weight : 0), 0);
+  const r = round(value, subject.config.finalDecimals);
   return {
     value,
-    rounded: round(value, subject.config.finalDecimals),
+    rounded: r == null ? null : Math.max(subject.config.minGrade ?? 1, r),
     terms,
     coverage: total > 0 ? covered / total : 0,
     belowMin: terms.some((t) => t.result.belowMin.length > 0),
@@ -103,9 +104,30 @@ export interface Profile {
 }
 
 /**
- * Perfil competencial. Cada actividad con nodos vinculados aporta su nota a esos nodos.
- * Los valores suben por las relaciones `aggregate`. Lo no evaluado se ignora (no cuenta como 0).
- * Todos los elementos del mismo nivel pesan igual.
+ * Peso de cada actividad calificada en la nota final: peso del trimestre × peso del instrumento ×
+ * su parte dentro de las actividades calificadas de ese trimestre e instrumento.
+ */
+function activityShares(subject: Subject, activities: Activity[], grades: Map<string, Grade>): Map<string, number> {
+  const graded = activities.filter((a) => effectiveValue(grades.get(a.id), subject) != null);
+  const sums = new Map<string, number>();
+  for (const a of graded) {
+    const k = `${a.termId}|${a.instrumentId}`;
+    sums.set(k, (sums.get(k) ?? 0) + Math.max(a.weight, 0));
+  }
+  const out = new Map<string, number>();
+  for (const a of graded) {
+    const tw = subject.terms.find((t) => t.id === a.termId)?.weight ?? 0;
+    const iw = subject.instruments.find((i) => i.id === a.instrumentId)?.weight ?? 0;
+    const sum = sums.get(`${a.termId}|${a.instrumentId}`)!;
+    out.set(a.id, sum > 0 ? (tw * iw * Math.max(a.weight, 0)) / sum : 0);
+  }
+  return out;
+}
+
+/**
+ * Perfil competencial. Cada actividad con nodos vinculados aporta su nota a esos nodos, con el mismo
+ * peso que tiene en la nota final. Los valores suben por las relaciones `aggregate`. Lo no evaluado
+ * se ignora (no cuenta como 0). Todos los elementos del mismo nivel pesan igual.
  */
 export function profile(
   subject: Subject,
@@ -115,23 +137,40 @@ export function profile(
   grades: Map<string, Grade>,
   termId?: string
 ): Profile {
-  const direct = new Map<string, Array<[Num, number]>>();
-  for (const a of activities) {
-    if (termId && a.termId !== termId) continue;
-    const v = effectiveValue(grades.get(a.id), subject);
-    if (v == null) continue;
-    for (const id of a.nodeIds) {
-      if (!direct.has(id)) direct.set(id, []);
-      direct.get(id)!.push([v, a.weight]);
-    }
-  }
-
   const children = new Map<string, string[]>();
+  const parents = new Map<string, string[]>();
   for (const r of subject.relations.filter((x) => x.aggregate)) {
     for (const l of links) {
       if (l.relation !== r.key || l.deleted) continue;
       if (!children.has(l.toId)) children.set(l.toId, []);
       children.get(l.toId)!.push(l.fromId);
+      if (!parents.has(l.fromId)) parents.set(l.fromId, []);
+      parents.get(l.fromId)!.push(l.toId);
+    }
+  }
+  const ancestors = (id: string, seen = new Set<string>()): Set<string> => {
+    for (const p of parents.get(id) ?? []) {
+      if (seen.has(p)) continue;
+      seen.add(p);
+      ancestors(p, seen);
+    }
+    return seen;
+  };
+
+  const acts = activities.filter((a) => !termId || a.termId === termId);
+  const shares = activityShares(subject, acts, grades);
+  const direct = new Map<string, Array<[Num, number]>>();
+  for (const a of acts) {
+    const v = effectiveValue(grades.get(a.id), subject);
+    if (v == null) continue;
+    // Si la actividad evalúa un nodo y también a uno de sus descendientes, gana el más específico:
+    // la nota ya sube al ancestro por la agregación y no debe contarse dos veces.
+    const covered = new Set<string>();
+    for (const id of a.nodeIds) for (const p of ancestors(id)) covered.add(p);
+    for (const id of a.nodeIds) {
+      if (covered.has(id)) continue;
+      if (!direct.has(id)) direct.set(id, []);
+      direct.get(id)!.push([v, shares.get(a.id) ?? 0]);
     }
   }
 

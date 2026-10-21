@@ -11,7 +11,7 @@ import { configured } from '../data/sync';
 import { applyPending, describe, pullActivity, pullGroup } from '../data/classroomSync';
 import type { PullResult } from '../data/classroomSync';
 import { PushGrades, RubricMap } from './ClassroomPanel';
-import { useGroups, useNodes, usePlannedSessions } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes, usePlannedSessions } from './hooks';
 import { activityBase, activityValue, indexGrades, profile, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
 import type { Num, StudentGrades } from '../core/evaluation';
 import { gradedLevels } from '../core/curriculum';
@@ -49,7 +49,7 @@ function ItemRow({ s, a, node, g, rubric, onRecover }: { s: Student; a: Activity
   );
 }
 
-export function Notebook({ subject }: { subject: Subject }) {
+export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: string }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const rbRaw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
@@ -62,13 +62,13 @@ export function Notebook({ subject }: { subject: Subject }) {
     ? nodes.filter((n) => n.level === gl).map((n) => ({ id: n.id, name: n.code, title: n.title }))
     : subject.instruments.map((i) => ({ id: i.id, name: i.name.slice(0, 10), title: `${i.name} (${i.weight} %)` }));
   const [items, setItems] = useState(true);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const planned = usePlannedSessions(group);
   const atRaw = useLiveQuery(() => (group ? db.attendance.where('groupId').equals(group.id).toArray() : []), [group?.id]);
-  const [view, setView] = useState<'table' | 'act' | 'final'>('table');
+  const [view, setView] = useState<'table' | 'act' | 'final'>(focusAct ? 'act' : 'table');
   const [termId, setTermId] = useState('');
-  const [actId, setActId] = useState('');
+  const [actId, setActId] = useState(focusAct ?? '');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [imp, setImp] = useState(false);
@@ -225,9 +225,6 @@ export function Notebook({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row">
-        <select value={group.id} onChange={(e) => setGid(e.target.value)}>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-        </select>
         <button className={view === 'table' ? 'on' : ''} onClick={() => setView('table')}>Tabla</button>
         <button className={view === 'act' ? 'on' : ''} onClick={() => setView('act')}>Por actividad</button>
         <button className={view === 'final' ? 'on' : ''} onClick={() => setView('final')}>Final</button>

@@ -143,3 +143,9 @@ En **Currículo**:
 - **Currículo → Objetivos**: objetivos de etapa (se pegan del BOA, con un prompt para pedírselos a una IA, o se copian de otra asignatura) y qué competencias específicas contribuyen a cada uno. No cuentan para la nota.
 - **Currículo → Versiones**: guardar la programación («Programación 2026/27»: configuración, currículo, vínculos, unidades y rúbricas, sin alumnado ni notas), ver qué ha cambiado desde entonces, volver a ella (antes se guarda la actual) o descargarla.
 - **Conexión → Copia de seguridad en un archivo**: descargar, aviso si hace más de 14 días de la última, y restaurar con vista previa: «Combinar» (no pierde nada posterior) o «Volver a la copia». Sirve también el `cuaderno-docente-db.json` de Drive.
+
+## Nueva navegación y pantalla Hoy (Fase 20)
+- **Navegación**: en el móvil, barra inferior con Hoy, Cuaderno, Planificar y Más; en el ordenador, menú lateral con todo. Más agrupa Alumnado (grupos, asistencia, informes, comunicación con el alumnado), Programación (currículo, evaluación y configuración, calendario escolar, nueva asignatura) y Datos (conexión y copias).
+- **Grupo de trabajo** único: se elige arriba («1.º BA · Proyectos Artísticos») y vale para todas las pantallas; se recuerda en el dispositivo.
+- **Hoy**: las clases del día de todos los grupos (sesiones planificadas o el horario), con ‹ › para ir a otros días. Cada clase muestra unidad y tema, lo pendiente de la sesión anterior, la asistencia y, según toque, «Pasar lista» (abre la lista de esa hora con tarjetas), «Ver o corregir la lista» o «Anotar realizado y pendiente». Debajo, **Por corregir** (actividades con fecha pasada y alumnos sin nota; abre la actividad en el Cuaderno) y **Avisos** (faltas, copia de seguridad, calendario escolar).
+- **Aspecto**: tipografía Inter (también sin conexión), colores y tamaños nuevos, botones más grandes, modo oscuro.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { absenceSummary, canImprove, outcome, scaleLabel, twoParts } from './rules';
+import { absenceSummary, canImprove, obsGrade, outcome, scaleLabel, twoParts } from './rules';
 import { indexGrades, noGrades } from './evaluation';
 import type { Activity, Attendance, Grade, Student } from './model';
 import { pa } from '../catalogs/pa';
@@ -103,5 +103,20 @@ describe('canImprove (Proyectos Artísticos: fuera de plazo no mejorable)', () =
     expect(canImprove(PA, g(false))).toBe(true);
     expect(canImprove(PA, undefined)).toBe(true);
     expect(canImprove(MM, g(true))).toBe(true);
+  });
+});
+
+describe('obsGrade', () => {
+  const at = (date: string, obs: string[], studentId = 's1'): Attendance => ({ id: `${studentId}|${date}|1`, studentId, groupId: 'g', date, slot: '1', status: 'P', obs, updatedAt: 0 });
+  const rows = [at('2026-10-05', ['part']), at('2026-10-07', ['part', 'grupo']), at('2026-10-14', ['mat']), at('2026-12-20', ['comp', 'comp']), at('2026-10-05', ['comp'], 's2')];
+  it('base 6 ± 0,5 por marca, por fechas y por alumno', () => {
+    expect(obsGrade(pa.subject, rows, 's1', '2026-09-01', '2026-12-04')).toEqual({ value: 7, pos: 3, neg: 1, counts: { part: 2, grupo: 1, mat: 1 } });
+    expect(obsGrade(pa.subject, rows, 's1').value).toBe(6); // + 3 − 3
+    expect(obsGrade(pa.subject, rows, 's2').value).toBe(5.5);
+    expect(obsGrade(pa.subject, [], 's3').value).toBe(6);
+  });
+  it('aspectos, base y paso de la materia; entre 0 y 10', () => {
+    const s = { ...pa.subject, config: { ...pa.subject.config, observations: [{ id: 'x', label: 'X', sign: -1 as const }], obsBase: 1, obsStep: 2 } };
+    expect(obsGrade(s, [at('2026-10-05', ['x', 'part'])], 's1')).toMatchObject({ value: 0, neg: 1, pos: 0 });
   });
 });

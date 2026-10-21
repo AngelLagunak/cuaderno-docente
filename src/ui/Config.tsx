@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { db, saveSubject } from '../data/db';
-import type { Subject } from '../core/model';
+import { db, saveSubject, softDelete } from '../data/db';
+import { defaultObservations } from '../core/model';
+import type { ObsAspect, Subject } from '../core/model';
 
 const slug = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nivel';
@@ -15,7 +16,15 @@ export function Config({ subject }: { subject: Subject }) {
   const cfg = (p: Partial<Subject['config']>) => set({ config: { ...d.config, ...p } });
   const sum = (a: { weight: number }[]) => a.reduce((s, x) => s + x.weight, 0);
   const lbl = (k: string) => d.levels.find((l) => l.key === k)?.label ?? k;
+  const obs = d.config.observations ?? defaultObservations();
+  const setObs = (o: ObsAspect[]) => cfg({ observations: o });
 
+  async function removeSubject() {
+    const n = await db.groups.where('subjectId').equals(d.id).filter((g) => !g.deleted).count();
+    if (n) return alert(`La asignatura tiene ${n} grupos. Bórralos antes en la pestaña Grupos.`);
+    if (!confirm(`¿Borrar la asignatura «${subject.name}» con su currículo y su configuración?`)) return;
+    await softDelete(db.subjects, subject);
+  }
   async function delInstrument(id: string) {
     const n = await db.activities.where('subjectId').equals(d.id).filter((a) => !a.deleted && a.instrumentId === id).count();
     if (n) return alert(`Hay ${n} actividades con este instrumento. Cámbialas antes.`);
@@ -109,6 +118,24 @@ export function Config({ subject }: { subject: Subject }) {
         <label>Sesiones anuales previstas (0 = las del calendario escolar y el horario del grupo) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>
       </div>
 
+      <h3>Observaciones del aula</h3>
+      <div className="card form">
+        <p className="mute">Se marcan al pasar lista (Asistencia) y dan la nota de las actividades «Nota desde las observaciones del aula»: base + paso por cada marca positiva − paso por cada negativa.</p>
+        {obs.map((o, k) => (
+          <div className="row" key={o.id}>
+            <select value={o.sign} onChange={(e) => setObs(obs.map((x, j) => (j === k ? { ...x, sign: Number(e.target.value) as 1 | -1 } : x)))}>
+              <option value={1}>+ suma</option>
+              <option value={-1}>− resta</option>
+            </select>
+            <input value={o.label} onChange={(e) => setObs(obs.map((x, j) => (j === k ? { ...x, label: e.target.value } : x)))} />
+            <button className="small" onClick={() => setObs(obs.filter((_, j) => j !== k))}>×</button>
+          </div>
+        ))}
+        <div className="row"><button className="small" onClick={() => setObs([...obs, { id: 'o' + Date.now().toString(36), label: 'Nueva observación', sign: 1 }])}>+ Observación</button></div>
+        <label>Nota base (sin marcas) <input className="num" type="number" min={0} max={10} step="0.5" value={d.config.obsBase ?? 6} onChange={(e) => cfg({ obsBase: num(e.target.value, 6) })} /></label>
+        <label>Paso por marca <input className="num" type="number" min={0} max={10} step="0.25" value={d.config.obsStep ?? 0.5} onChange={(e) => cfg({ obsStep: num(e.target.value, 0.5) })} /></label>
+      </div>
+
       <h3>Estructura curricular</h3>
       <div className="card">
         <b className="mute">Niveles</b>
@@ -145,6 +172,7 @@ export function Config({ subject }: { subject: Subject }) {
       <div className="row">
         <button className="on" onClick={async () => { await saveSubject(d); setSaved(true); }}>Guardar configuración</button>
         {saved && <span className="mute">Guardado</span>}
+        <button className="small" onClick={removeSubject}>Borrar asignatura</button>
       </div>
     </div>
   );

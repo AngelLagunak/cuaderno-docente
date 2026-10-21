@@ -1,5 +1,6 @@
 import { Suspense, lazy, useMemo, useState } from 'react';
 import { CurriculumMatrix } from './CurriculumMatrix';
+import { CurriculumAI } from './CurriculumAI';
 
 const CurriculumMap = lazy(() => import('./CurriculumMap'));
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -58,7 +59,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
 
   const lv = subject.levels.find((l) => l.key === levelKey) ?? subject.levels[0];
   const issues = useMemo(() => review(subject, nodes, links), [subject, nodes, links]);
-  if (!lv) return <div className="card">Esta materia no tiene niveles. Defínelos en Configuración.</div>;
+  if (!lv) return <div><CurriculumAI subject={subject} nodes={nodes} /><div className="card">Esta materia no tiene niveles. Carga el currículo con una IA o defínelos en Configuración.</div></div>;
 
   const rels = subject.relations.filter((r) => r.from === lv.key || r.to === lv.key);
   const levelOf = (k: string) => subject.levels.find((l) => l.key === k);
@@ -147,6 +148,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
             <input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
             <button onClick={startAdd}>+ {lv.label}</button>
           </div>
+          <CurriculumAI subject={subject} nodes={nodes} />
           {rels.length === 0 && <p className="mute">Sin vínculos para este nivel (se definen en Configuración → Estructura).</p>}
           {adding && (
             <div className="card">

@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
 import { useGroups, usePlannedSessions } from './hooks';
 import { SessionNotes } from './Calendar';
+import { defaultObservations } from '../core/model';
 import type { AttStatus, Attendance as Att, Student, Subject } from '../core/model';
 
 const STATUS: [AttStatus, string][] = [['P', 'Presente'], ['A', 'Ausente'], ['R', 'Retraso'], ['J', 'Justificada']];
@@ -38,6 +39,7 @@ export function Attendance({ subject }: { subject: Subject }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const planned = usePlannedSessions(group);
+  const [showObs, setShowObs] = useState(true);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = (stRaw ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es'));
@@ -48,8 +50,17 @@ export function Attendance({ subject }: { subject: Subject }) {
   const sessionHeld = students.some((s) => byKey.has(key(s)));
 
   const mk = (s: Student, status: AttStatus, now: number): Att => ({
-    id: key(s), studentId: s.id, groupId: group!.id, date, slot, status, updatedAt: now, ...(byKey.get(key(s))?.note ? { note: byKey.get(key(s))!.note } : {}),
+    ...byKey.get(key(s)), id: key(s), studentId: s.id, groupId: group!.id, date, slot, status, updatedAt: now, deleted: false,
   });
+  const aspects = subject.config.observations ?? defaultObservations();
+  /** Marca o quita una observación del aula; si la sesión no tenía lista, se pasa con todos presentes. */
+  async function toggleObs(s: Student, id: string) {
+    const now = Date.now();
+    const cur = byKey.get(key(s));
+    const obs = cur?.obs?.includes(id) ? cur.obs.filter((x) => x !== id) : [...(cur?.obs ?? []), id];
+    const missing = students.filter((x) => !byKey.has(key(x)) && x.id !== s.id).map((x) => mk(x, 'P', now));
+    await db.attendance.bulkPut([...missing, { ...mk(s, cur?.status ?? 'P', now), obs }]);
+  }
 
   async function setStatus(s: Student, st: AttStatus) {
     const now = Date.now();
@@ -119,23 +130,36 @@ export function Attendance({ subject }: { subject: Subject }) {
             <label>Hora <input className="num" style={{ width: 60 }} value={slot} onChange={(e) => setSlot(e.target.value.trim() || '1')} /></label>
             {!sessionHeld && <button className="on" onClick={markAll}>Todos presentes</button>}
             {sessionHeld && <button className="small" onClick={delSession}>Borrar sesión</button>}
+            <label><input type="checkbox" style={{ width: 'auto' }} checked={showObs} onChange={(e) => setShowObs(e.target.checked)} /> Observaciones</label>
           </div>
           <SessionNotes groupId={group.id} date={date} slot={slot} />
           {!sessionHeld && <p className="mute">Sesión sin lista. Pulsa «Todos presentes» o marca a quien falte.</p>}
           {students.map((s) => {
             const st = byKey.get(key(s))?.status ?? 'P';
+            const obs = byKey.get(key(s))?.obs ?? [];
             return (
-              <div className="issue sp" key={s.id} style={{ alignItems: 'center' }}>
-                <span>{s.lastName}, {s.firstName}</span>
-                <span className="row" style={{ margin: 0, flexWrap: 'nowrap' }}>
-                  {STATUS.map(([k, l]) => (
-                    <button key={k} title={l} aria-label={l} className={'small' + (sessionHeld && st === k ? ' on' : '')} onClick={() => setStatus(s, k)}>{k}</button>
-                  ))}
-                </span>
+              <div className="issue att" key={s.id}>
+                <div className="sp" style={{ alignItems: 'center' }}>
+                  <span>{s.lastName}, {s.firstName}</span>
+                  <span className="row" style={{ margin: 0, flexWrap: 'nowrap' }}>
+                    {STATUS.map(([k, l]) => (
+                      <button key={k} title={l} aria-label={l} className={'small' + (sessionHeld && st === k ? ' on' : '')} onClick={() => setStatus(s, k)}>{k}</button>
+                    ))}
+                  </span>
+                </div>
+                {showObs && (
+                  <div className="chips">
+                    {aspects.map((a) => (
+                      <button key={a.id} className={'chip obs' + (obs.includes(a.id) ? (a.sign > 0 ? ' pos' : ' neg') : '')} aria-pressed={obs.includes(a.id)} onClick={() => toggleObs(s, a.id)}>
+                        {a.sign > 0 ? '+' : '−'} {a.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
-          <p className="mute">P presente · A ausente · R retraso · J falta justificada</p>
+          <p className="mute">P presente · A ausente · R retraso · J falta justificada{showObs ? '. Las observaciones (+ / −) se usan en las actividades de dinámica del aula marcadas «Nota desde las observaciones».' : ''}</p>
         </div>
       )}
 

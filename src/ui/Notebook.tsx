@@ -1,5 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ImportGrades } from './ImportGrades';
+import { SigadExport } from './SigadExport';
+import { ObsPanel } from './ObsPanel';
 import { Cell, RecMark, fmt, parse, raw } from './cells';
 import { FinalView } from './FinalView';
 import { canImprove, outcome, scaleLabel } from '../core/rules';
@@ -70,6 +72,7 @@ export function Notebook({ subject }: { subject: Subject }) {
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [imp, setImp] = useState(false);
+  const [sigad, setSigad] = useState(false);
   const undoLabel = useSyncExternalStore(subscribeUndo, lastUndo);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
@@ -231,11 +234,13 @@ export function Notebook({ subject }: { subject: Subject }) {
         <button className="small" onClick={exportCsv}>Exportar CSV</button>
         <button className="small" onClick={exportXlsx}>Exportar Excel</button>
         <button className="small" onClick={() => setImp(!imp)}>Importar notas</button>
+        <button className="small" onClick={() => setSigad(!sigad)}>SIGAD</button>
         {undoLabel && <button className="small" onClick={async () => setMsg(`Deshecho: ${await undo()}.`)} title="Deshace el último cambio de notas de esta sesión">↶ Deshacer {undoLabel}</button>}
         {group.classroomCourseId && linked > 0 && <button className="small" disabled={busy} onClick={() => pullAll()} title="Traer notas y rúbricas de todas las tareas vinculadas">Classroom ⟳</button>}
       </div>
 
       {msg && <p className="mute">{msg}</p>}
+      {sigad && <SigadExport subject={subject} students={students} acts={acts} sgOf={sgOf} curr={curr} onDone={(m) => { setSigad(false); if (m) setMsg(m); }} />}
       {imp && <ImportGrades subject={subject} students={students} acts={acts} sgOf={sgOf} onDone={(m) => { setImp(false); if (m) setMsg(m); }} />}
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}
       {students.length > 0 && acts.length === 0 && <p className="mute">Crea actividades en el Planificador.</p>}
@@ -305,6 +310,7 @@ export function Notebook({ subject }: { subject: Subject }) {
               <PushGrades act={act} group={group} students={students} grades={grRaw ?? []} onMsg={setMsg} />
             </div>
           )}
+          {act.fromObs && <ObsPanel subject={subject} group={group} act={act} students={students} att={(atRaw ?? []).filter((r) => !r.deleted)} sgOf={sgOf} onMsg={setMsg} />}
           {act.rubric && <RubricMap key={act.id + (act.updatedAt ?? 0)} subject={subject} act={act} nodes={nodes} onResult={(r) => finish(r, ' con el nuevo emparejamiento')} />}
           {students.map((s) => {
             const g = sgOf(s).byActivity.get(act.id);

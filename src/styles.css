@@ -43,7 +43,7 @@ table.t th { font-weight:600; color:var(--mute); vertical-align:bottom; max-widt
 table.t td:first-child, table.t th:first-child { position:sticky; left:0; background:var(--card); text-align:left; z-index:1; }
 table.t .sum { background:var(--chip); font-weight:600; }
 input.cell { width:54px; padding:5px 4px; text-align:center; }
-input.bad { border-color:var(--warn); }
+input.bad, select.bad { border-color:var(--warn); }
 span.cell { display:inline-block; width:54px; padding:5px 4px; text-align:center; }
 .calc { background:var(--chip); border-radius:8px; }
 .items { padding:0 0 8px 12px; border-bottom:1px solid var(--line); }
@@ -85,3 +85,8 @@ td.mxon { background:var(--chip); }
 .session.done .sp b { color:var(--brand); }
 .pend { font-size:.8rem; color:var(--warn); border-left:3px solid var(--warn); padding:2px 6px; overflow-wrap:anywhere; }
 .day { min-width:0; }
+
+.issue.att { display:block; }
+.chip.obs { cursor:pointer; font-size:.8rem; border:1px solid var(--line); background:transparent; color:var(--mute); }
+.chip.obs.pos { background:var(--brand); border-color:var(--brand); color:var(--card); }
+.chip.obs.neg { background:var(--warn); border-color:var(--warn); color:var(--card); }

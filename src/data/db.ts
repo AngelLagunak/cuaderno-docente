@@ -42,7 +42,7 @@ export const db = new DB();
 /** Carga los catálogos la primera vez. No sobrescribe materias ya existentes. */
 export async function seed() {
   for (const s of await db.subjects.toArray()) {
-    const m = migrateSubject(s);
+    const m = migrateSubject(s, catalogs.find((c) => c.subject.id === s.id)?.subject);
     if (m) await saveSubject(m);
   }
   for (const c of catalogs) {

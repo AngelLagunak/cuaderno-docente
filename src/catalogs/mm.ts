@@ -54,7 +54,8 @@ const subject: Subject = {
     { id: 't1', name: '1.ª evaluación', weight: 50 },
     { id: 't2', name: '2.ª evaluación', weight: 50 },
   ],
-  config: { passMark: 5, termDecimals: 1, finalDecimals: 1, minPerInstrument: false, latePenaltyPct: 30, absenceWarnPct: 20, annualSessions: 54, gradeLevel: null },
+  config: { passMark: 5, termDecimals: 1, finalDecimals: 1, minPerInstrument: false, latePenaltyPct: 30, absenceWarnPct: 20, annualSessions: 54, gradeLevel: null,
+    lec: { folderPct: 40, examPct: 60 }, extra: { projectsPct: 40, examPct: 60, minEach: 0 }, lateNoImprove: false, scale: 'ssapntsb' },
 };
 
 export const mm = { subject, nodes, links: [] };

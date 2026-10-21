@@ -37,6 +37,14 @@ export interface SubjectConfig {
    * null o vacío: media ponderada de instrumentos. undefined: aún no elegido (se aplica la migración de la materia).
    */
   gradeLevel?: string | null;
+  /** Pérdida de evaluación continua: carpeta/dossier + prueba global (porcentajes). */
+  lec?: { folderPct: number; examPct: number };
+  /** Convocatoria extraordinaria: proyectos/trabajos + examen; `minEach` > 0 exige esa nota en ambas partes para hacer media. */
+  extra?: { projectsPct: number; examPct: number; minEach: number };
+  /** Entrega fuera de plazo sin justificar: no se puede mejorar (recuperar). */
+  lateNoImprove?: boolean;
+  /** Escala de la nota final: numérica o SS/AP/NT/SB. */
+  scale?: 'num' | 'ssapntsb';
   /** Si true, una nota < passMark en algún instrumento marca la evaluación como no superada. */
   minPerInstrument: boolean;
   /** % de penalización por entrega tardía (0 = no se usa). */
@@ -83,7 +91,14 @@ export const linkId = (subjectId: ID, relation: string, fromId: ID, toId: ID) =>
   `${subjectId}/${relation}:${fromId}>${toId}`;
 
 export interface Group extends Stamp { id: ID; subjectId: ID; name: string; schoolYear: string; classroomCourseId?: string }
-export interface Student extends Stamp { id: ID; groupId: ID; firstName: string; lastName: string; email?: string; nia?: string; classroomUserId?: string }
+export interface Student extends Stamp {
+  id: ID; groupId: ID; firstName: string; lastName: string; email?: string; nia?: string; classroomUserId?: string;
+  /** Pérdida de evaluación continua (la decide el docente) y notas de la vía alternativa. */
+  lec?: boolean;
+  lecGrades?: { folder: number | null; exam: number | null };
+  /** Notas de la convocatoria extraordinaria. */
+  extra?: { projects: number | null; exam: number | null };
+}
 
 /** Una actividad pertenece a un instrumento y a un trimestre. Los nodos curriculares son opcionales. */
 export interface Activity extends Stamp {
@@ -118,6 +133,9 @@ export interface Grade extends Stamp {
   /** Nivel de la rúbrica propia (0 = primer nivel). */
   level?: number;
   value: number | null;
+  /** Recuperación: nota anterior (la que cuenta es `value`) y fecha AAAA-MM-DD. */
+  prev?: number | null;
+  recoveredAt?: string;
   late?: boolean;
   comment?: string;
   rubric?: RubricGrade[];

@@ -167,7 +167,7 @@ export function Attendance({ subject }: { subject: Subject }) {
             <button onClick={exportSessions} disabled={!sessions.length}>Exportar por sesión (CSV)</button>
             <button onClick={exportWeekly} disabled={!sessions.length}>Exportar resumen semanal (CSV)</button>
           </div>
-          <p className="mute">El formato se ajustará cuando tengamos un ejemplo de exportación de SIGAD.</p>
+          <p className="mute">La pérdida de evaluación continua la marcas tú en Cuaderno → Final (la app solo avisa). El formato se ajustará cuando tengamos un ejemplo de exportación de SIGAD.</p>
         </>
       )}
     </div>

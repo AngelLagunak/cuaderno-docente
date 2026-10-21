@@ -1,52 +1,27 @@
 import { useState } from 'react';
+import { Cell, RecMark, fmt, parse, raw } from './cells';
+import { FinalView } from './FinalView';
+import { canImprove, outcome, scaleLabel } from '../core/rules';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, saveGrade, saveItemGrade } from '../data/db';
 import { callScript } from '../data/api';
 import type { CGrades } from '../data/api';
 import { useGroups, useNodes } from './hooks';
-import { activityBase, activityValue, finalResult, indexGrades, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
+import { activityBase, activityValue, indexGrades, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
 import type { Num, StudentGrades } from '../core/evaluation';
 import { gradedLevels } from '../core/curriculum';
 import type { Activity, CNode, Grade, Rubric, Student, Subject } from '../core/model';
 
-const fmt = (v: Num, d: number) => (v == null ? '—' : v.toFixed(d).replace('.', ','));
-const raw = (v: Num | undefined) => (v == null ? '' : String(v).replace('.', ','));
-const parse = (t: string): Num | undefined => {
-  const s = t.trim().replace(',', '.');
-  if (s === '') return null;
-  const n = Number(s);
-  return Number.isFinite(n) && n >= 0 && n <= 10 ? n : undefined;
-};
-
-function Cell({ g, label, onSave }: { g?: Grade; label: string; onSave: (v: number | null) => void }) {
-  const [bad, setBad] = useState(false);
-  return (
-    <input
-      className={'cell' + (bad ? ' bad' : '')}
-      inputMode="decimal"
-      defaultValue={raw(g?.value)}
-      key={g?.updatedAt ?? 0}
-      aria-label={label}
-      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      onBlur={(e) => {
-        const v = parse(e.target.value);
-        if (v === undefined) { setBad(true); e.target.value = raw(g?.value); return; }
-        setBad(false);
-        if (v !== (g?.value ?? null)) onSave(v);
-      }}
-    />
-  );
-}
-
 /** Casilla de la nota de una actividad: editable, o calculada si se ha calificado por criterios. */
 function ActCell({ sg, s, a }: { sg: StudentGrades; s: Student; a: Activity }) {
   const n = itemGrades(a, sg).length;
-  if (n) return <span className="cell calc" title={`Media de ${n} criterios`}>{fmt(activityBase(a, sg), 2)}</span>;
-  return <Cell g={sg.byActivity.get(a.id)} label={`${s.lastName} · ${a.title}`} onSave={(v) => saveGrade(s.id, a.id, { value: v })} />;
+  if (n) return <span className="cell calc" title={`Media de ${n} criterios`}>{fmt(activityBase(a, sg), 2)}{itemGrades(a, sg).some((g) => g.recoveredAt) && <RecMark g={itemGrades(a, sg).find((g) => g.recoveredAt)} />}</span>;
+  const g = sg.byActivity.get(a.id);
+  return <><Cell value={g?.value} stamp={g?.updatedAt} label={`${s.lastName} · ${a.title}`} onSave={(v) => saveGrade(s.id, a.id, { value: v })} /><RecMark g={g} /></>;
 }
 
 /** Nota de un criterio: botones de nivel si la rúbrica de la actividad tiene fila para él; si no, casilla numérica. */
-function ItemRow({ s, a, node, g, rubric }: { s: Student; a: Activity; node: CNode; g?: Grade; rubric?: Rubric }) {
+function ItemRow({ s, a, node, g, rubric, onRecover }: { s: Student; a: Activity; node: CNode; g?: Grade; rubric?: Rubric; onRecover: () => void }) {
   const row = rubric?.rows.find((r) => r.nodeId === node.id);
   const lv = row && g?.level != null ? rubric!.levels[g.level] : undefined;
   return (
@@ -60,8 +35,10 @@ function ItemRow({ s, a, node, g, rubric }: { s: Student; a: Activity; node: CNo
           ))}
         </span>
       ) : (
-        <Cell g={g} label={`${s.lastName} · ${node.code}`} onSave={(v) => saveItemGrade(s.id, a.id, node.id, { value: v, level: undefined })} />
+        <Cell value={g?.value} stamp={g?.updatedAt} label={`${s.lastName} · ${node.code}`} onSave={(v) => saveItemGrade(s.id, a.id, node.id, { value: v, level: undefined })} />
       )}
+      <RecMark g={g} />
+      {g?.value != null && <button className="small" title="Registrar recuperación" onClick={onRecover}>Rec.</button>}
       <span className="mute">{lv ? `${lv.label} · ${raw(lv.value)}${row?.text[g!.level!] ? ' — ' + row.text[g!.level!] : ''}` : ''}</span>
     </div>
   );
@@ -82,6 +59,7 @@ export function Notebook({ subject }: { subject: Subject }) {
   const [items, setItems] = useState(true);
   const [gid, setGid] = useState('');
   const group = groups.find((g) => g.id === gid) ?? groups[0];
+  const atRaw = useLiveQuery(() => (group ? db.attendance.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const [view, setView] = useState<'table' | 'act' | 'final'>('table');
   const [termId, setTermId] = useState('');
   const [actId, setActId] = useState('');
@@ -110,14 +88,16 @@ export function Notebook({ subject }: { subject: Subject }) {
 
   function exportCsv() {
     const q = (x: string) => `"${x.replace(/"/g, '""')}"`;
-    const head = ['Apellidos', 'Nombre', ...acts.map((a) => `${a.title} (${subject.terms.find((t) => t.id === a.termId)?.name})`), ...subject.terms.map((t) => t.name), 'Final'];
+    const head = ['Apellidos', 'Nombre', ...acts.map((a) => `${a.title} (${subject.terms.find((t) => t.id === a.termId)?.name})`), ...subject.terms.map((t) => t.name), 'Ordinaria', 'Vía', 'Oficial', ...(cfg.scale === 'ssapntsb' ? ['Calificación'] : [])];
     const lines = students.map((s) => {
       const m = sgOf(s);
-      const f = finalResult(subject, acts, m, curr);
+      const o = outcome(subject, acts, m, curr, s);
+      const f = o.ordinary;
       return [s.lastName, s.firstName,
         ...acts.map((a) => raw(round(activityBase(a, m), 2))),
         ...f.terms.map((t) => fmt(round(t.result.value, cfg.termDecimals), cfg.termDecimals)),
-        fmt(f.rounded, cfg.finalDecimals)].map((x) => q(String(x))).join(';');
+        fmt(f.rounded, cfg.finalDecimals), o.source, fmt(o.official, cfg.finalDecimals),
+        ...(cfg.scale === 'ssapntsb' ? [scaleLabel(subject, o.official)] : [])].map((x) => q(String(x))).join(';');
     });
     const blob = new Blob(['\ufeff' + [head.map(q).join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
@@ -166,9 +146,44 @@ export function Notebook({ subject }: { subject: Subject }) {
 
   const LateBtn = ({ s, a }: { s: Student; a: Activity }) => {
     const g = sgOf(s).byActivity.get(a.id);
-    if (!cfg.latePenaltyPct || activityBase(a, sgOf(s)) == null) return null;
-    return <button className={'small late' + (g?.late ? ' on' : '')} title={`Entrega tardía (−${cfg.latePenaltyPct} %)`} onClick={() => saveGrade(s.id, a.id, { late: !g?.late })}>T</button>;
+    if ((!cfg.latePenaltyPct && !cfg.lateNoImprove) || activityBase(a, sgOf(s)) == null) return null;
+    const what = [cfg.latePenaltyPct ? `−${cfg.latePenaltyPct} %` : '', cfg.lateNoImprove ? 'no se podrá mejorar' : ''].filter(Boolean).join('; ');
+    return <button className={'small late' + (g?.late ? ' on' : '')} title={`Entrega fuera de plazo sin justificar (${what})`} onClick={() => saveGrade(s.id, a.id, { late: !g?.late })}>T</button>;
   };
+
+  /** Recuperación: guarda la nota anterior (la primera, si ya se recuperó antes) y cuenta la nueva. */
+  async function recover(s: Student, a: Activity, node?: CNode) {
+    const sg = sgOf(s);
+    if (!canImprove(subject, sg.byActivity.get(a.id))) return alert('Entrega fuera de plazo sin justificar: no se puede mejorar.');
+    const g = node ? sg.byItem.get(a.id)?.get(node.id) : sg.byActivity.get(a.id);
+    const rubric = rubricOf(a);
+    const row = node && rubric?.rows.find((r) => r.nodeId === node.id);
+    const what = node ? node.code : a.title;
+    const ans = prompt(row ? `Recuperación de ${what}: nivel (1–${rubric!.levels.length}). Antes: ${fmt(g?.value ?? null, 2)}` : `Nota de la recuperación de ${what} (antes ${fmt(g?.value ?? null, 2)})`);
+    if (ans == null || ans.trim() === '') return;
+    const prev = g?.recoveredAt ? g.prev ?? null : g?.value ?? null;
+    const recoveredAt = new Date().toISOString().slice(0, 10);
+    let patch: Partial<Grade>;
+    if (row) {
+      const i = Number(ans) - 1;
+      if (!rubric!.levels[i]) return alert('Nivel no válido.');
+      patch = { value: rubric!.levels[i].value, level: i, prev, recoveredAt };
+    } else {
+      const v = parse(ans);
+      if (v == null) return alert('Nota no válida (0–10).');
+      patch = { value: v, level: undefined, prev, recoveredAt };
+    }
+    if (node) await saveItemGrade(s.id, a.id, node.id, patch);
+    else await saveGrade(s.id, a.id, patch);
+  }
+
+  /** Entrega vacía o archivo corrupto: vale 0 (en todos sus criterios si se califica por criterio). */
+  async function emptyDelivery(s: Student, a: Activity) {
+    if (!confirm(`¿Entrega vacía o archivo corrupto de ${s.firstName} en «${a.title}»? Se calificará con 0.`)) return;
+    const its = actItems(a);
+    if (its.length && items) for (const n of its) await saveItemGrade(s.id, a.id, n.id, { value: 0, level: undefined });
+    await saveGrade(s.id, a.id, { ...(its.length && items ? {} : { value: 0 }), comment: 'Entrega vacía o archivo corrupto' });
+  }
 
   return (
     <div>
@@ -258,10 +273,14 @@ export function Notebook({ subject }: { subject: Subject }) {
                   <input className="cell" style={{ width: 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
                     onBlur={(e) => e.target.value !== (g?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />
                   <span><ActCell sg={sgOf(s)} s={s} a={act} /><LateBtn s={s} a={act} /></span>
+                  <span className="row" style={{ margin: 0, gap: 4 }}>
+                    {itemGrades(act, sgOf(s)).length === 0 && g?.value != null && <button className="small" title="Registrar recuperación (se guarda la nota anterior)" onClick={() => recover(s, act)}>Rec.</button>}
+                    <button className="small" title="Entrega vacía o archivo corrupto: 0" onClick={() => emptyDelivery(s, act)}>∅</button>
+                  </span>
                 </div>
                 {its.length > 0 && (
                   <div className="items">
-                    {its.map((n) => <ItemRow key={n.id} s={s} a={act} node={n} g={sgOf(s).byItem.get(act.id)?.get(n.id)} rubric={rubricOf(act)} />)}
+                    {its.map((n) => <ItemRow key={n.id} s={s} a={act} node={n} g={sgOf(s).byItem.get(act.id)?.get(n.id)} rubric={rubricOf(act)} onRecover={() => recover(s, act, n)} />)}
                   </div>
                 )}
                 {act.rubric && g?.rubric?.length ? (
@@ -281,38 +300,8 @@ export function Notebook({ subject }: { subject: Subject }) {
       )}
 
       {students.length > 0 && acts.length > 0 && view === 'final' && (
-        <div className="tw">
-          <table className="t">
-            <thead>
-              <tr>
-                <th>Alumno</th>
-                {subject.terms.map((t) => <th key={t.id}>{t.name}</th>)}
-                <th className="sum">Final</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s) => {
-                const f = finalResult(subject, acts, sgOf(s), curr);
-                const fail = f.rounded != null && f.rounded < cfg.passMark;
-                return (
-                  <tr key={s.id}>
-                    <td>{s.lastName}, {s.firstName}</td>
-                    {f.terms.map((t) => (
-                      <td key={t.id} className={t.result.belowMin.length ? 'warn' : ''} title={t.result.belowMin.length ? `Bajo mínimo: ${t.result.belowMin.join(', ')}` : ''}>
-                        {fmt(round(t.result.value, cfg.termDecimals), cfg.termDecimals)}
-                      </td>
-                    ))}
-                    <td className={'sum' + (fail || f.belowMin ? ' warn' : '')} title={f.belowMin ? `Alguna parte (${partLabel}) por debajo del aprobado` : f.coverage < 1 ? 'Provisional' : ''}>
-                      {fmt(f.rounded, cfg.finalDecimals)}{f.coverage < 1 && f.value != null ? '*' : ''}{f.belowMin ? '!' : ''}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <FinalView subject={subject} students={students} acts={acts} sgOf={sgOf} curr={curr} att={(atRaw ?? []).filter((r) => !r.deleted)} partLabel={partLabel} />
       )}
-      {view === 'final' && <p className="mute">Final = media ponderada de las evaluaciones con datos. * provisional. ! alguna parte ({partLabel}) bajo el aprobado (en rojo).</p>}
     </div>
   );
 }

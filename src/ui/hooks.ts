@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
 import { plannedSessions } from '../core/planning';
@@ -26,4 +26,18 @@ export function useSchoolCalendar(schoolYear?: string) {
 export function usePlannedSessions(group?: Group) {
   const cal = useSchoolCalendar(group?.schoolYear);
   return group ? plannedSessions(cal, group.timetable ?? [], group.holidays)?.total : undefined;
+}
+
+// Grupo de trabajo actual: el mismo en todas las pantallas (se elige arriba) y recordado en el dispositivo.
+const groupSubs = new Set<() => void>();
+const readGroup = () => { try { return localStorage.getItem('groupId') ?? ''; } catch { return ''; } };
+let currentGroup = readGroup();
+export function setCurrentGroup(id: string) {
+  currentGroup = id;
+  try { localStorage.setItem('groupId', id); } catch { /* sin almacenamiento: solo en memoria */ }
+  groupSubs.forEach((f) => f());
+}
+export function useCurrentGroupId(): [string, (id: string) => void] {
+  const id = useSyncExternalStore((f) => { groupSubs.add(f); return () => { groupSubs.delete(f); }; }, () => currentGroup);
+  return [id, setCurrentGroup];
 }

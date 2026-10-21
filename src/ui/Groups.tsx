@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
-import { useGroups } from './hooks';
+import { useCurrentGroupId, useGroups } from './hooks';
 import { callScript } from '../data/api';
 import type { CCourse, CStudent } from '../data/api';
 import type { Group, Student, Subject } from '../core/model';
@@ -109,7 +109,7 @@ function ClassroomImport({ group, students }: { group: Group; students: Student[
 
 export function Groups({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const all = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = (all ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es'));
@@ -155,9 +155,6 @@ export function Groups({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row">
-        <select value={group?.id ?? ''} onChange={(e) => setGid(e.target.value)}>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-        </select>
         <button onClick={newGroup}>+ Grupo</button>
         {group && <button className="small" onClick={renameGroup}>Renombrar</button>}
         {group && <button className="small" onClick={delGroup}>Borrar</button>}

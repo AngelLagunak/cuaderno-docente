@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Bar, BarChart, Legend, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { db } from '../data/db';
-import { useGroups, useNodes } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes } from './hooks';
 import { activityBase, finalResult, indexGrades, itemGrades, noGrades, profile, round, wmean } from '../core/evaluation';
 import { outcome, scaleLabel } from '../core/rules';
 import type { Num, Profile } from '../core/evaluation';
@@ -18,7 +18,7 @@ const COLORS = ['#2d4a7a', '#e08a1e', '#2e7d4f', '#9c3d8f', '#b54708'];
 export function Reports({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [view, setView] = useState<'student' | 'group'>('student');
   const [sid, setSid] = useState('');
@@ -124,9 +124,6 @@ export function Reports({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row noprint">
-        <select value={group.id} onChange={(e) => setGid(e.target.value)}>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-        </select>
         <button className={view === 'student' ? 'on' : ''} onClick={() => setView('student')}>Alumno</button>
         <button className={view === 'group' ? 'on' : ''} onClick={() => setView('group')}>Grupo</button>
         <button className="small" onClick={() => window.print()}>Imprimir / PDF</button>

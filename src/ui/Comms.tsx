@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { callScript } from '../data/api';
-import { useGroups, useNodes } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes } from './hooks';
 import { finalResult, indexGrades, noGrades, profile, round } from '../core/evaluation';
 import { criteriaText } from '../core/report';
 import type { Student, Subject, Template } from '../core/model';
@@ -22,7 +22,7 @@ export function Comms({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const tplRaw = useLiveQuery(() => db.templates.toArray());
   const templates = useMemo(() => (tplRaw ?? []).filter((t) => !t.deleted), [tplRaw]);
@@ -31,6 +31,7 @@ export function Comms({ subject }: { subject: Subject }) {
   const [subj, setSubj] = useState('');
   const [body, setBody] = useState('');
   const [sel, setSel] = useState<string[]>([]);
+  useEffect(() => setSel([]), [gid]);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -120,9 +121,6 @@ export function Comms({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row">
-        <select value={group.id} onChange={(e) => { setGid(e.target.value); setSel([]); }}>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-        </select>
         <button className={kind === 'mail' ? 'on' : ''} onClick={() => setKind('mail')}>Correo</button>
         <button className={kind === 'announcement' ? 'on' : ''} disabled={!canAnnounce} onClick={() => setKind('announcement')} title={canAnnounce ? '' : 'Enlaza el grupo con Classroom en Grupos'}>Tablón</button>
       </div>

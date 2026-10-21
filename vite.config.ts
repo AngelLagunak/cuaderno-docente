@@ -9,6 +9,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Inter (latín) también sin conexión; los demás alfabetos no se usan.
+      workbox: { globPatterns: ['**/*.{js,css,html,png,svg,webmanifest}', '**/inter-latin*-wght-normal*.woff2'] },
       manifest: {
         name: 'Cuaderno docente',
         short_name: 'Cuaderno',
@@ -16,7 +18,7 @@ export default defineConfig({
         scope: '/cuaderno-docente/',
         display: 'standalone',
         background_color: '#ffffff',
-        theme_color: '#2d4a7a',
+        theme_color: '#24477a',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }

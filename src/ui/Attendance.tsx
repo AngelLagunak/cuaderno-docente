@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
-import { useGroups, usePlannedSessions } from './hooks';
+import { useCurrentGroupId, useGroups, usePlannedSessions } from './hooks';
 import { SessionNotes } from './Calendar';
 import { defaultObservations } from '../core/model';
 import type { AttStatus, Attendance as Att, Student, Subject } from '../core/model';
@@ -29,13 +29,13 @@ function download(name: string, rows: string[][]) {
   a.click();
 }
 
-export function Attendance({ subject }: { subject: Subject }) {
+export function Attendance({ subject, preset }: { subject: Subject; preset?: { date: string; slot: string } }) {
   const groups = useGroups(subject.id);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [view, setView] = useState<'list' | 'sum'>('list');
-  const [date, setDate] = useState(today());
-  const [slot, setSlot] = useState('1');
+  const [date, setDate] = useState(preset?.date ?? today());
+  const [slot, setSlot] = useState(preset?.slot ?? '1');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const planned = usePlannedSessions(group);
@@ -131,9 +131,6 @@ export function Attendance({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row">
-        <select value={group.id} onChange={(e) => setGid(e.target.value)}>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-        </select>
         <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>Pasar lista</button>
         <button className={view === 'sum' ? 'on' : ''} onClick={() => setView('sum')}>Resumen</button>
       </div>

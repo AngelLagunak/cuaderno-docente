@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { addDays, bySessionOrder, distribute, holidayItems, monday, parseHolidays, previousPending, schoolDays, unitBalance, ymd } from '../core/planning';
 import { DAYS, TimetableGrid } from './Timetable';
-import { useSchoolCalendar } from './hooks';
+import { useCurrentGroupId, useSchoolCalendar } from './hooks';
 import type { Activity, Group, LearningUnit, Session, Subject } from '../core/model';
 
 const dm = (s: string) => s.split('-').reverse().slice(0, 2).join('/');
@@ -51,7 +51,7 @@ function Generate({ group, existing, onDone }: { group: Group; existing: Session
 }
 
 /** Qué se ha hecho en la sesión y qué queda para la siguiente (se ve en la sesión siguiente). */
-function DonePending({ s }: { s: Session }) {
+export function DonePending({ s }: { s: Session }) {
   const save = (p: Partial<Session>) => db.sessions.update(s.id, { ...p, updatedAt: Date.now() });
   return (
     <>
@@ -108,7 +108,7 @@ export function SessionNotes({ groupId, date, slot }: { groupId: string; date: s
  * Generar sesiones desde el horario semanal y repartir las unidades según sus sesiones previstas.
  */
 export function Calendar({ subject, groups, units, acts }: { subject: Subject; groups: Group[]; units: LearningUnit[]; acts: Activity[] }) {
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [week, setWeek] = useState(monday(ymd(new Date())));
   const [gen, setGen] = useState(false);
@@ -138,9 +138,6 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
   return (
     <div>
       <div className="row">
-        <select value={group.id} onChange={(e) => setGid(e.target.value)}>
-          {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-        </select>
         <button className="small" onClick={() => setGen(!gen)}>Generar sesiones</button>
         <button className="small" disabled={!units.length || !sessions.length} onClick={spread}>Repartir unidades</button>
       </div>

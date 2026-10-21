@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
-import { useGroups, useNodes } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes } from './hooks';
 import { NodePicker } from './NodePicker';
 import { Rubrics } from './Rubrics';
 import { Calendar } from './Calendar';
@@ -200,7 +200,7 @@ function WorkImport(p: { subject: Subject; group: Group; existing: Activity[]; o
 export function Planner({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
-  const [gid, setGid] = useState('');
+  const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const unitsRaw = useLiveQuery(() => db.units.where('subjectId').equals(subject.id).toArray(), [subject.id]);
   const actsRaw = useLiveQuery(() => db.activities.where('subjectId').equals(subject.id).toArray(), [subject.id]);
@@ -261,9 +261,6 @@ export function Planner({ subject }: { subject: Subject }) {
       ) : (
         <>
           <div className="row">
-            <select value={group?.id} onChange={(e) => setGid(e.target.value)}>
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.name} · {g.schoolYear}</option>)}
-            </select>
             {!ea && <button onClick={newAct}>+ Actividad</button>}
             {group?.classroomCourseId && <button onClick={() => setImp(!imp)}>Importar de Classroom</button>}
           </div>

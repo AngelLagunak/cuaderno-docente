@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seed } from './data/db';
-import { startAutoSync, syncNow, useSyncStatus } from './data/sync';
+import { purgeDeleted, startAutoSync, syncNow, useSyncStatus } from './data/sync';
 import { Attendance } from './ui/Attendance';
 import { Comms } from './ui/Comms';
 import { Config } from './ui/Config';
@@ -43,7 +43,7 @@ export function App() {
 
   useEffect(() => {
     navigator.storage?.persist?.();
-    seed().catch(console.error);
+    seed().then(purgeDeleted).catch(console.error);
     return startAutoSync();
   }, []);
 

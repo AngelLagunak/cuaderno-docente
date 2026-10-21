@@ -95,18 +95,75 @@ export async function deleteNode(n: CNode) {
   });
 }
 
+// ---------- Deshacer (cambios de notas y alumnos de esta sesión) ----------
+
+type UndoEntry = { table: 'grades' | 'students'; id: string; before: Grade | Student | undefined };
+const undoStack: { label: string; entries: UndoEntry[] }[] = [];
+let batch: { label: string; entries: UndoEntry[] } | null = null;
+const undoSubs = new Set<() => void>();
+const notifyUndo = () => undoSubs.forEach((f) => f());
+export const subscribeUndo = (f: () => void) => { undoSubs.add(f); return () => { undoSubs.delete(f); }; };
+/** Texto de lo último que se puede deshacer, o '' si nada. */
+export const lastUndo = () => undoStack[undoStack.length - 1]?.label ?? '';
+
+function remember(table: UndoEntry['table'], id: string, before: UndoEntry['before'], label: string) {
+  const e = { table, id, before: before && { ...before } };
+  if (batch) { if (!batch.entries.some((x) => x.table === table && x.id === id)) batch.entries.push(e); return; }
+  undoStack.push({ label, entries: [e] });
+  if (undoStack.length > 50) undoStack.shift();
+  notifyUndo();
+}
+
+/** Agrupa varios cambios para deshacerlos de una vez (importaciones, Classroom…). */
+export async function undoable<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  if (batch) return fn();
+  batch = { label, entries: [] };
+  try { return await fn(); }
+  finally {
+    const b = batch;
+    batch = null;
+    if (b.entries.length) { undoStack.push(b); if (undoStack.length > 50) undoStack.shift(); notifyUndo(); }
+  }
+}
+
+/** Deshace el último cambio (o grupo de cambios). Lo que no existía queda borrado. */
+export async function undo() {
+  const g = undoStack.pop();
+  notifyUndo();
+  if (!g) return '';
+  const now = Date.now();
+  for (const e of [...g.entries].reverse()) {
+    const t = e.table === 'grades' ? db.grades : db.students;
+    if (e.before) await (t as Table<Grade | Student, string>).put({ ...e.before, updatedAt: now });
+    else {
+      const cur = await t.get(e.id);
+      if (cur) await (t as Table<Grade | Student, string>).put({ ...cur, deleted: true, updatedAt: now });
+    }
+  }
+  return g.label;
+}
+
 /** Nota global de una actividad (sin criterio). */
 export async function saveGrade(studentId: string, activityId: string, patch: Partial<Grade>) {
   const id = `${studentId}|${activityId}`;
   const cur = await db.grades.get(id);
-  await db.grades.put({ id, studentId, activityId, value: null, ...cur, ...patch, updatedAt: Date.now() });
+  remember('grades', id, cur, 'nota');
+  await db.grades.put({ id, studentId, activityId, value: null, ...cur, ...patch, deleted: false, updatedAt: Date.now() });
 }
 
 /** Nota de un criterio en una actividad. */
 export async function saveItemGrade(studentId: string, activityId: string, nodeId: string, patch: Partial<Grade>) {
   const id = `${studentId}|${activityId}|${nodeId}`;
   const cur = await db.grades.get(id);
+  remember('grades', id, cur, 'nota de criterio');
   await db.grades.put({ id, studentId, activityId, nodeId, value: null, ...cur, ...patch, deleted: false, updatedAt: Date.now() });
+}
+
+/** Cambia datos de un alumno (pérdida de evaluación continua, extraordinaria…). */
+export async function saveStudent(s: Student, patch: Partial<Student>) {
+  const cur = await db.students.get(s.id);
+  remember('students', s.id, cur, 'alumno');
+  await db.students.put({ ...(cur ?? s), ...patch, updatedAt: Date.now() });
 }
 
 /** Guarda una rúbrica y recalcula las notas puestas con ella si han cambiado los valores de los niveles. */

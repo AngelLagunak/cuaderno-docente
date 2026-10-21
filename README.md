@@ -106,3 +106,9 @@ Todo es configurable por materia en Configuración. La exportación CSV incluye 
 3. Implementar → Gestionar implementaciones → lápiz → Versión: **Nueva versión** → Implementar (la URL no cambia).
 
 El servidor también elimina de `cuaderno-docente-db.json` los borrados de hace más de 60 días.
+
+## Importar, exportar y deshacer (Fase 14)
+- **Cuaderno → Importar notas**: CSV o Excel con una fila por alumno (NIA, correo o apellidos y nombre) y una columna por actividad. Vista previa con el emparejamiento de columnas; las notas distintas a las de la app solo se sobrescriben si lo marcas. Sirve el archivo que exporta la propia app.
+- **Exportar Excel**: hoja «Notas» (actividades, evaluaciones, ordinaria, vía y nota oficial) y hoja «Criterios» (competencias específicas, criterios y concreciones de todo el curso).
+- **↶ Deshacer**: deshace los últimos cambios de notas de esta sesión (también importaciones, recuperaciones y notas traídas de Classroom, de una vez).
+- Los borrados de hace más de 60 días se eliminan del dispositivo (si ya se enviaron al servidor) y del archivo de Drive.

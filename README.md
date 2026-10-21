@@ -53,7 +53,7 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 
 ## Tests del motor (Paso 1)
 - `src/core/*.test.ts` (vitest) prueban el cálculo con datos reales de los catálogos. Se ejecutan en GitHub Actions en cada subida; si fallan, no se publica.
-- Perfil competencial: cada actividad pesa lo mismo que en la nota final (trimestre × instrumento × peso dentro del instrumento). Si una actividad evalúa un criterio y uno de sus indicadores, la nota cuenta una sola vez.
+- Perfil competencial: cada actividad pesa lo mismo que en la nota final (trimestre × instrumento × peso dentro del instrumento). Si una actividad evalúa un criterio y una de sus concreciones, la nota cuenta una sola vez.
 - Nota final mínima 1 tras redondear (SIGAD no admite 0). Ajustable en Configuración.
 
 ## Nota por criterio y rúbricas (Fase 9)
@@ -61,3 +61,9 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - **Rúbricas propias** (Planificador → Rúbricas): 4 niveles con su nota (por defecto 2,5 / 5 / 7,5 / 10) y una fila por criterio con descriptores opcionales. Al asignar una rúbrica a una actividad se añaden sus criterios y se califica con un toque (1–4). Si cambias la nota de un nivel, se recalculan las notas puestas con esa rúbrica.
 - **Avisos**: actividades sin criterio, y tabla de cobertura criterio × instrumento.
 - Las notas anteriores se conservan como nota global; la base de datos local pasa a la versión 5 sin tocar los datos. No hay que actualizar el Apps Script.
+
+## Informes por criterio (Fase 10)
+- **Informes → Alumno**: comparar con la media del grupo o entre evaluaciones (una serie por evaluación). Bajo el radar, tabla con el valor de cada eje; lo no evaluado aparece como «Sin evaluar», no como 0.
+- **Informes → Grupo**: casilla «Comparar evaluaciones» con la media del grupo en cada una.
+- El nivel «Indicador» pasa a llamarse **«Concreción»** (como en la programación), para no confundirlo con los indicadores de logro. Se renombra solo en las instalaciones existentes; si le habías puesto otro nombre, se respeta.
+- Marcadores nuevos en Comunicación: `{{criterio}}` (criterios evaluados con su nota, todo el curso) y `{{criterios_pendientes}}` (solo los que no llegan al aprobado).

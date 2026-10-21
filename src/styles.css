@@ -52,6 +52,7 @@ span.cell { display:inline-block; width:54px; padding:5px 4px; text-align:center
 .lvls { display:inline-flex; gap:4px; }
 .lvls button { min-width:34px; }
 table.c td { font-variant-numeric: tabular-nums; }
+table.t td.wrap { white-space:normal; min-width:130px; max-width:200px; }
 .late { padding:1px 6px; font-size:.7rem; margin-left:2px; }
 @media print {
   .noprint { display:none !important; }

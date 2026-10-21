@@ -12,6 +12,7 @@ import { Planner } from './ui/Planner';
 import { Reports } from './ui/Reports';
 import { Settings } from './ui/Settings';
 import { SchoolCalendar } from './ui/SchoolCalendar';
+import { NewSubject } from './ui/NewSubject';
 
 const TABS = [
   ['notes', 'Cuaderno'],
@@ -41,7 +42,9 @@ function SyncBar() {
 export function App() {
   const [tab, setTab] = useState<Tab>('notes');
   const [sid, setSid] = useState('');
-  const subjects = useLiveQuery(() => db.subjects.toArray());
+  const all = useLiveQuery(() => db.subjects.toArray());
+  const subjects = all?.filter((s) => !s.deleted);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     navigator.storage?.persist?.();
@@ -58,8 +61,10 @@ export function App() {
         <select value={subject?.id ?? ''} onChange={(e) => setSid(e.target.value)}>
           {subjects?.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
+        <button className="small" title="Nueva asignatura" onClick={() => setAdding(!adding)}>+ Asignatura</button>
         <SyncBar />
       </div>
+      {adding && <NewSubject subjects={subjects ?? []} onDone={(id) => { setAdding(false); if (id) { setSid(id); setTab('config'); } }} />}
       <div className="tabs noprint">
         {TABS.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>)}
       </div>

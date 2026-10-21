@@ -130,3 +130,10 @@ En **Currículo**:
 - **Realizado / pendiente** en cada sesión (Planificador → Calendario y Asistencia): lo pendiente aparece en la sesión siguiente del grupo.
 - Los **saberes básicos** ya no se vinculan a criterios (no se evalúan): se incluyen en las unidades didácticas. El Planificador avisa de los saberes sin unidad.
 - **Descriptores** de las competencias clave con su redacción oficial (solo cambian los que no habías editado).
+
+## SIGAD, observaciones del aula y asignaturas nuevas (Fase 18)
+- **Cuaderno → SIGAD**: descarga de SIGAD el listado de calificaciones (.xls con Apellido1, Apellido2, Nombre y Calificación), elige la nota (cada evaluación, final ordinaria o extraordinaria) y cárgalo. La app empareja por apellidos y nombre (sin tildes ni mayúsculas; las filas sin emparejar se eligen a mano), rellena la columna Calificación sin tocar el resto del archivo y lo descarga como `…-notas.xls` para subirlo a SIGAD. Las notas son las oficiales (redondeo de Configuración, mínimo 1).
+- **Asistencia → Observaciones**: al pasar lista se marcan + Participa, + Trabajo en grupo, − Sin material, − Comportamiento (editables en Configuración → Observaciones del aula).
+- **Actividad «Nota desde las observaciones del aula»** (Planificador): en Cuaderno → Por actividad propone la nota con las marcas de las fechas de su evaluación (Calendario escolar): base 6 ± 0,5 por marca, entre 0 y 10. «Aplicar propuesta» la pone (se puede deshacer). Para que cuente en Proyectos Artísticos, la actividad necesita criterios (p. ej. 3.1).
+- **+ Asignatura**: plantilla LOMLOE (competencias específicas, criterios, descriptores y saberes), FP (resultados de aprendizaje y criterios), copia de instrumentos y cálculo de otra asignatura, o vacía. **Currículo → Cargar el currículo con una IA**: prompt para copiar y su respuesta (JSON) se añade a la asignatura; los descriptores de Bachillerato usan la redacción oficial.
+- **Configuración → Borrar asignatura** (si no tiene grupos).

@@ -53,12 +53,26 @@ export interface SubjectConfig {
   absenceWarnPct?: number;
   /** Sesiones anuales previstas; 0 o vacío = usar las sesiones pasadas lista. */
   annualSessions?: number;
+  /** Observaciones del aula que se marcan al pasar lista (participación, material…) y su cálculo: base ± paso. */
+  observations?: ObsAspect[];
+  obsBase?: number;
+  obsStep?: number;
 }
+
+/** Aspecto observable en clase: suma (+1) o resta (−1) en la nota de dinámica del aula. */
+export interface ObsAspect { id: string; label: string; sign: 1 | -1 }
+
+export const defaultObservations = (): ObsAspect[] => [
+  { id: 'part', label: 'Participa', sign: 1 },
+  { id: 'grupo', label: 'Trabajo en grupo', sign: 1 },
+  { id: 'mat', label: 'Sin material', sign: -1 },
+  { id: 'comp', label: 'Comportamiento', sign: -1 },
+];
 
 export interface Subject extends Stamp {
   id: ID;
   name: string;
-  kind: 'bach' | 'fp';
+  kind: 'bach' | 'eso' | 'fp' | 'otra';
   course: string;
   levels: LevelDef[];
   relations: RelationDef[];
@@ -127,6 +141,8 @@ export interface Activity extends Stamp {
   classroomCreated?: boolean;
   /** Rúbrica propia de la app. */
   rubricId?: ID;
+  /** La nota se calcula con las observaciones del aula marcadas al pasar lista (dinámica del aula). */
+  fromObs?: boolean;
   date?: string;
 }
 
@@ -200,6 +216,8 @@ export interface Attendance extends Stamp {
   slot: string;
   status: AttStatus;
   note?: string;
+  /** Observaciones del aula marcadas en esta sesión (ids de `config.observations`). */
+  obs?: string[];
 }
 
 export interface RubricDef {

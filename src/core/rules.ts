@@ -1,5 +1,6 @@
-import { finalResult, officialRound } from './evaluation';
+import { finalResult, officialRound, round } from './evaluation';
 import type { Curr, FinalResult, Num, StudentGrades } from './evaluation';
+import { defaultObservations } from './model';
 import type { Activity, Attendance, Grade, Student, Subject } from './model';
 
 /** Faltas de un alumno. Base del %: sesiones anuales previstas o, si no hay, sesiones con lista pasada. */
@@ -64,4 +65,26 @@ export function scaleLabel(subject: Subject, v: Num): string {
 /** Una entrega fuera de plazo sin justificar no se puede mejorar si la materia lo indica (Proyectos Artísticos). */
 export function canImprove(subject: Subject, overall: Grade | undefined): boolean {
   return !(subject.config.lateNoImprove && overall?.late);
+}
+
+/**
+ * Nota de dinámica del aula a partir de las observaciones marcadas al pasar lista entre dos fechas:
+ * base (6 por defecto) + paso (0,5) por cada marca positiva − paso por cada negativa, entre 0 y 10.
+ */
+export function obsGrade(subject: Subject, rows: Attendance[], studentId: string, from = '', to = '') {
+  const aspects = subject.config.observations ?? defaultObservations();
+  const sign = new Map(aspects.map((a) => [a.id, a.sign]));
+  const counts: Record<string, number> = {};
+  let pos = 0, neg = 0;
+  for (const r of rows) {
+    if (r.deleted || r.studentId !== studentId || (from && r.date < from) || (to && r.date > to)) continue;
+    for (const id of r.obs ?? []) {
+      const sg = sign.get(id);
+      if (!sg) continue;
+      counts[id] = (counts[id] ?? 0) + 1;
+      if (sg > 0) pos++; else neg++;
+    }
+  }
+  const base = subject.config.obsBase ?? 6, step = subject.config.obsStep ?? 0.5;
+  return { value: Math.min(10, Math.max(0, round(base + step * (pos - neg), 2)!)), pos, neg, counts };
 }

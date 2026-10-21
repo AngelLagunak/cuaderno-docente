@@ -117,6 +117,7 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
         <option value="">Sin rúbrica (nota numérica)</option>
         {p.rubrics.map((r) => <option key={r.id} value={r.id}>Rúbrica: {r.name}</option>)}
       </select>
+      <label><input type="checkbox" style={{ width: 'auto' }} checked={!!a.fromObs} onChange={(e) => setA({ ...a, fromObs: e.target.checked || undefined })} /> Nota desde las observaciones del aula (participación, material… marcadas en Asistencia)</label>
       <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
       {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
       {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}
@@ -281,7 +282,7 @@ export function Planner({ subject }: { subject: Subject }) {
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}
                         </div>
                         {noItems.has(a.id) && <div className="warn mute">⚠ Sin criterio</div>}
                         <div className="chips">

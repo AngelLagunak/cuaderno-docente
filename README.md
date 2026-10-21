@@ -67,3 +67,14 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - **Informes → Grupo**: casilla «Comparar evaluaciones» con la media del grupo en cada una.
 - El nivel «Indicador» pasa a llamarse **«Concreción»** (como en la programación), para no confundirlo con los indicadores de logro. Se renombra solo en las instalaciones existentes; si le habías puesto otro nombre, se respeta.
 - Marcadores nuevos en Comunicación: `{{criterio}}` (criterios evaluados con su nota, todo el curso) y `{{criterios_pendientes}}` (solo los que no llegan al aprobado).
+
+## Nota por competencias (Fase 11)
+Proyectos Artísticos calcula la nota según la cadena del currículo aragonés (LOMLOE):
+1. Los **instrumentos** (proyectos, cuaderno, dinámica, exámenes) miden **criterios**. Si varios instrumentos miden el mismo criterio, se combinan con 45/25/15/15; solo cuentan los que lo miden.
+2. Un criterio con **concreciones** es la media de sus concreciones.
+3. Cada **competencia específica** es la media de sus criterios evaluados (todos pesan igual).
+4. La **nota de cada evaluación** es la media de las competencias específicas evaluadas. Aviso si alguna no llega a 5.
+5. **Final ordinaria**: 30/30/40, entera, mínimo 1.
+6. Las **competencias clave** salen de las competencias específicas a través de los descriptores (radar, no nota).
+
+Una actividad sin criterios no cuenta para la nota en este modo. En Configuración → «Nota de cada evaluación» se puede volver a la media ponderada de instrumentos. Modelado y Maquetismo sigue por instrumentos (60/30/10) y evaluaciones 50/50.

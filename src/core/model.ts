@@ -32,6 +32,11 @@ export interface SubjectConfig {
   finalDecimals: number;
   /** Nota final mínima tras redondear (SIGAD no admite 0). Por defecto 1. */
   minGrade?: number;
+  /**
+   * Nivel curricular del que sale la nota de cada evaluación (p. ej. 'ce': media de las competencias específicas).
+   * null o vacío: media ponderada de instrumentos. undefined: aún no elegido (se aplica la migración de la materia).
+   */
+  gradeLevel?: string | null;
   /** Si true, una nota < passMark en algún instrumento marca la evaluación como no superada. */
   minPerInstrument: boolean;
   /** % de penalización por entrega tardía (0 = no se usa). */

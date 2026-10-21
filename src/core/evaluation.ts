@@ -76,13 +76,21 @@ function penalize(v: number, a: Activity, sg: StudentGrades, subject: Subject): 
   return v * (1 - p / 100);
 }
 
+/** Elementos curriculares que necesita el cálculo por competencias. */
+export interface Curr { nodes: CNode[]; links: CLink[] }
+
 export interface InstrumentResult { id: string; name: string; weight: number; value: Num }
+/** Parte de la nota: un instrumento o un elemento curricular (p. ej. una competencia específica). */
+export interface Part { id: string; name: string; weight: number; value: Num }
 export interface TermResult {
   value: Num;
+  /** Media por instrumento (informativa si la nota sale de las competencias). */
   byInstrument: InstrumentResult[];
-  /** Fracción (0–1) del peso de instrumentos con datos. */
+  /** Partes de las que sale la nota: instrumentos o elementos del nivel `gradeLevel`. */
+  parts: Part[];
+  /** Fracción (0–1) del peso de las partes con datos. */
   coverage: number;
-  /** Instrumentos con nota < passMark (solo si minPerInstrument). */
+  /** Partes con nota < passMark (solo si minPerInstrument). */
   belowMin: string[];
 }
 
@@ -90,7 +98,8 @@ export function termResult(
   subject: Subject,
   activities: Activity[],
   grades: StudentGrades,
-  termId: string
+  termId: string,
+  curr: Curr
 ): TermResult {
   const acts = activities.filter((a) => a.termId === termId);
   const byInstrument: InstrumentResult[] = subject.instruments.map((i) => ({
@@ -103,13 +112,21 @@ export function termResult(
         .map((a): [Num, number] => [activityValue(a, grades, subject), a.weight])
     ),
   }));
-  const value = wmean(byInstrument.map((i): [Num, number] => [i.value, i.weight]));
-  const total = byInstrument.reduce((s, i) => s + i.weight, 0);
-  const covered = byInstrument.reduce((s, i) => s + (i.value != null ? i.weight : 0), 0);
+  const level = subject.config.gradeLevel;
+  let parts: Part[] = byInstrument;
+  if (level) {
+    const prof = profile(subject, curr.nodes, curr.links, activities, grades, termId);
+    parts = curr.nodes
+      .filter((n) => n.level === level && !n.deleted)
+      .map((n) => ({ id: n.id, name: n.code, weight: 1, value: prof.nodes.get(n.id) ?? null }));
+  }
+  const value = wmean(parts.map((p): [Num, number] => [p.value, p.weight]));
+  const total = parts.reduce((s, p) => s + p.weight, 0);
+  const covered = parts.reduce((s, p) => s + (p.value != null ? p.weight : 0), 0);
   const belowMin = subject.config.minPerInstrument
-    ? byInstrument.filter((i) => i.value != null && i.value < subject.config.passMark).map((i) => i.name)
+    ? parts.filter((p) => p.value != null && p.value < subject.config.passMark).map((p) => p.name)
     : [];
-  return { value, byInstrument, coverage: total > 0 ? covered / total : 0, belowMin };
+  return { value, byInstrument, parts, coverage: total > 0 ? covered / total : 0, belowMin };
 }
 
 export interface FinalResult {
@@ -117,28 +134,34 @@ export interface FinalResult {
   rounded: Num;
   terms: { id: string; name: string; weight: number; result: TermResult }[];
   coverage: number;
-  /** Algún trimestre con instrumento bajo mínimo. */
+  /** Algún trimestre con una parte bajo el aprobado. */
   belowMin: boolean;
+}
+
+/** Redondeo oficial de la nota final: decimales configurados y mínimo `minGrade` (1 para SIGAD). */
+export function officialRound(subject: Subject, v: Num): Num {
+  const r = round(v, subject.config.finalDecimals);
+  return r == null ? null : Math.max(subject.config.minGrade ?? 1, r);
 }
 
 export function finalResult(
   subject: Subject,
   activities: Activity[],
-  grades: StudentGrades
+  grades: StudentGrades,
+  curr: Curr
 ): FinalResult {
   const terms = subject.terms.map((t) => ({
     id: t.id,
     name: t.name,
     weight: t.weight,
-    result: termResult(subject, activities, grades, t.id),
+    result: termResult(subject, activities, grades, t.id, curr),
   }));
   const value = wmean(terms.map((t): [Num, number] => [t.result.value, t.weight]));
   const total = terms.reduce((s, t) => s + t.weight, 0);
   const covered = terms.reduce((s, t) => s + (t.result.value != null ? t.weight : 0), 0);
-  const r = round(value, subject.config.finalDecimals);
   return {
     value,
-    rounded: r == null ? null : Math.max(subject.config.minGrade ?? 1, r),
+    rounded: officialRound(subject, value),
     terms,
     coverage: total > 0 ? covered / total : 0,
     belowMin: terms.some((t) => t.result.belowMin.length > 0),
@@ -150,27 +173,6 @@ export interface Profile {
   nodes: Map<string, Num>;
   /** Valor por grupo de descriptores (competencias clave). */
   groups: Map<string, Num>;
-}
-
-/**
- * Peso de cada actividad calificada en la nota final: peso del trimestre × peso del instrumento ×
- * su parte dentro de las actividades calificadas de ese trimestre e instrumento.
- */
-function activityShares(subject: Subject, activities: Activity[], grades: StudentGrades): Map<string, number> {
-  const graded = activities.filter((a) => activityBase(a, grades) != null);
-  const sums = new Map<string, number>();
-  for (const a of graded) {
-    const k = `${a.termId}|${a.instrumentId}`;
-    sums.set(k, (sums.get(k) ?? 0) + Math.max(a.weight, 0));
-  }
-  const out = new Map<string, number>();
-  for (const a of graded) {
-    const tw = subject.terms.find((t) => t.id === a.termId)?.weight ?? 0;
-    const iw = subject.instruments.find((i) => i.id === a.instrumentId)?.weight ?? 0;
-    const sum = sums.get(`${a.termId}|${a.instrumentId}`)!;
-    out.set(a.id, sum > 0 ? (tw * iw * Math.max(a.weight, 0)) / sum : 0);
-  }
-  return out;
 }
 
 /** Hijos de cada nodo según las relaciones `aggregate` (el valor del hijo sube al padre). */
@@ -198,10 +200,12 @@ export function aggregateTree(subject: Subject, links: CLink[]) {
 }
 
 /**
- * Perfil competencial. Cada actividad aporta a sus nodos con el mismo peso que tiene en la nota final:
- * la nota de cada criterio calificado o, si no hay notas por criterio, la nota global a todos sus nodos.
- * Los valores suben por las relaciones `aggregate`. Lo no evaluado se ignora (no cuenta como 0).
- * Todos los elementos del mismo nivel pesan igual.
+ * Perfil competencial (cadena de la LOMLOE: instrumentos → criterios → competencias específicas → descriptores
+ * → competencias clave). Cada actividad mide sus criterios: con la nota de cada criterio calificado o, si no hay
+ * notas por criterio, con la nota global. Dentro de un nodo, las medidas se agrupan por evaluación e instrumento:
+ * media por grupo (con el peso de cada actividad) y luego media de grupos con peso evaluación × instrumento.
+ * Así solo cuentan los instrumentos que miden ese criterio. Los valores suben por las relaciones `aggregate`,
+ * con el mismo peso para cada hijo. Lo no evaluado se ignora (no cuenta como 0).
  */
 export function profile(
   subject: Subject,
@@ -213,8 +217,10 @@ export function profile(
 ): Profile {
   const { children, ancestors } = aggregateTree(subject, links);
   const acts = activities.filter((a) => !termId || a.termId === termId);
-  const shares = activityShares(subject, acts, grades);
-  const direct = new Map<string, Array<[Num, number]>>();
+  const tw = new Map(subject.terms.map((t) => [t.id, t.weight]));
+  const iw = new Map(subject.instruments.map((i) => [i.id, i.weight]));
+  // nodo → grupo (evaluación|instrumento) → medidas [valor, peso de la actividad]
+  const direct = new Map<string, Map<string, Array<[Num, number]>>>();
   for (const a of acts) {
     const items = itemGrades(a, grades);
     const base = activityBase(a, grades);
@@ -228,17 +234,25 @@ export function profile(
     for (const [id] of vals) for (const p of ancestors(id)) covered.add(p);
     for (const [id, v] of vals) {
       if (covered.has(id)) continue;
-      if (!direct.has(id)) direct.set(id, []);
-      direct.get(id)!.push([v, shares.get(a.id) ?? 0]);
+      if (!direct.has(id)) direct.set(id, new Map());
+      const k = `${a.termId}|${a.instrumentId}`;
+      const g = direct.get(id)!;
+      if (!g.has(k)) g.set(k, []);
+      g.get(k)!.push([v, a.weight]);
     }
   }
+  const directValue = (id: string): Num =>
+    wmean([...(direct.get(id) ?? new Map<string, Array<[Num, number]>>())].map(([k, ms]): [Num, number] => {
+      const [t, i] = k.split('|');
+      return [wmean(ms), (tw.get(t) ?? 0) * (iw.get(i) ?? 0)];
+    }));
 
   const memo = new Map<string, Num>();
   const val = (id: string): Num => {
     if (memo.has(id)) return memo.get(id)!;
     memo.set(id, null); // protección ante ciclos
     const parts: Array<[Num, number]> = [];
-    const d = wmean(direct.get(id) ?? []);
+    const d = directValue(id);
     if (d != null) parts.push([d, 1]);
     for (const c of children.get(id) ?? []) {
       const cv = val(c);

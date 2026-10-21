@@ -71,6 +71,14 @@ export function Notebook({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const rbRaw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
+  const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
+  const curr = { nodes, links: lkRaw ?? [] };
+  const gl = subject.config.gradeLevel;
+  const partLabel = gl ? (subject.levels.find((l) => l.key === gl)?.plural.toLowerCase() ?? 'partes') : 'instrumentos';
+  // Columnas de resumen: competencias (si la nota sale de ellas) o instrumentos.
+  const partsHead = gl
+    ? nodes.filter((n) => n.level === gl).map((n) => ({ id: n.id, name: n.code, title: n.title }))
+    : subject.instruments.map((i) => ({ id: i.id, name: i.name.slice(0, 10), title: `${i.name} (${i.weight} %)` }));
   const [items, setItems] = useState(true);
   const [gid, setGid] = useState('');
   const group = groups.find((g) => g.id === gid) ?? groups[0];
@@ -105,7 +113,7 @@ export function Notebook({ subject }: { subject: Subject }) {
     const head = ['Apellidos', 'Nombre', ...acts.map((a) => `${a.title} (${subject.terms.find((t) => t.id === a.termId)?.name})`), ...subject.terms.map((t) => t.name), 'Final'];
     const lines = students.map((s) => {
       const m = sgOf(s);
-      const f = finalResult(subject, acts, m);
+      const f = finalResult(subject, acts, m, curr);
       return [s.lastName, s.firstName,
         ...acts.map((a) => raw(round(activityBase(a, m), 2))),
         ...f.terms.map((t) => fmt(round(t.result.value, cfg.termDecimals), cfg.termDecimals)),
@@ -197,20 +205,20 @@ export function Notebook({ subject }: { subject: Subject }) {
             <thead>
               <tr>
                 <th>Alumno</th>
-                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}>{a.title}<div className="mute">{instName(a.instrumentId).slice(0, 10)}</div></th>)}
-                {subject.instruments.map((i) => <th key={i.id} className="sum">{i.name.slice(0, 10)}</th>)}
+                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}>{a.title}<div className="mute">{instName(a.instrumentId).slice(0, 10)}</div>{gl && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
+                {partsHead.map((p) => <th key={p.id} className="sum" title={p.title}>{p.name}</th>)}
                 <th className="sum">{term.name}</th>
               </tr>
             </thead>
             <tbody>
               {students.map((s) => {
-                const r = termResult(subject, acts, sgOf(s), term.id);
+                const r = termResult(subject, acts, sgOf(s), term.id, curr);
                 return (
                   <tr key={s.id}>
                     <td>{s.lastName}, {s.firstName}</td>
                     {termActs.map((a) => <td key={a.id}><ActCell sg={sgOf(s)} s={s} a={a} /><LateBtn s={s} a={a} /></td>)}
-                    {r.byInstrument.map((i) => <td key={i.id} className={'sum' + (cfg.minPerInstrument && i.value != null && i.value < cfg.passMark ? ' warn' : '')}>{fmt(round(i.value, cfg.termDecimals), cfg.termDecimals)}</td>)}
-                    <td className="sum" title={r.coverage < 1 ? `Provisional: ${Math.round(r.coverage * 100)} % de instrumentos con datos` : ''}>
+                    {r.parts.map((i) => <td key={i.id} className={'sum' + (cfg.minPerInstrument && i.value != null && i.value < cfg.passMark ? ' warn' : '')}>{fmt(round(i.value, cfg.termDecimals), cfg.termDecimals)}</td>)}
+                    <td className="sum" title={r.coverage < 1 ? `Provisional: ${Math.round(r.coverage * 100)} % de ${partLabel} con datos` : ''}>
                       {fmt(round(r.value, cfg.termDecimals), cfg.termDecimals)}{r.coverage < 1 && r.value != null ? '*' : ''}
                     </td>
                   </tr>
@@ -219,13 +227,13 @@ export function Notebook({ subject }: { subject: Subject }) {
               <tr>
                 <td className="mute">Media</td>
                 {termActs.map((a) => <td key={a.id} className="mute">{fmt(round(wmean(students.map((s): [Num, number] => [activityValue(a, sgOf(s), subject), 1])), 1), 1)}</td>)}
-                <td colSpan={subject.instruments.length + 1} />
+                <td colSpan={partsHead.length + 1} />
               </tr>
             </tbody>
           </table>
         </div>
       )}
-      {view === 'table' && students.length > 0 && <p className="mute">* Provisional: faltan instrumentos por evaluar. Lo no evaluado no cuenta como 0. Se guarda al salir de la casilla o con Intro. Las notas sombreadas son la media de los criterios (se editan en «Por actividad»).</p>}
+      {view === 'table' && students.length > 0 && <p className="mute">* Provisional: faltan {partLabel} por evaluar.{gl ? ` La nota de la evaluación es la media de las ${partLabel} evaluadas.` : ''} Lo no evaluado no cuenta como 0. Se guarda al salir de la casilla o con Intro. Las notas sombreadas son la media de los criterios (se editan en «Por actividad»).</p>}
 
       {students.length > 0 && acts.length > 0 && view === 'act' && act && (
         <div className="card">
@@ -284,7 +292,7 @@ export function Notebook({ subject }: { subject: Subject }) {
             </thead>
             <tbody>
               {students.map((s) => {
-                const f = finalResult(subject, acts, sgOf(s));
+                const f = finalResult(subject, acts, sgOf(s), curr);
                 const fail = f.rounded != null && f.rounded < cfg.passMark;
                 return (
                   <tr key={s.id}>
@@ -294,7 +302,7 @@ export function Notebook({ subject }: { subject: Subject }) {
                         {fmt(round(t.result.value, cfg.termDecimals), cfg.termDecimals)}
                       </td>
                     ))}
-                    <td className={'sum' + (fail || f.belowMin ? ' warn' : '')} title={f.belowMin ? 'Algún instrumento por debajo del mínimo' : f.coverage < 1 ? 'Provisional' : ''}>
+                    <td className={'sum' + (fail || f.belowMin ? ' warn' : '')} title={f.belowMin ? `Alguna parte (${partLabel}) por debajo del aprobado` : f.coverage < 1 ? 'Provisional' : ''}>
                       {fmt(f.rounded, cfg.finalDecimals)}{f.coverage < 1 && f.value != null ? '*' : ''}{f.belowMin ? '!' : ''}
                     </td>
                   </tr>
@@ -304,7 +312,7 @@ export function Notebook({ subject }: { subject: Subject }) {
           </table>
         </div>
       )}
-      {view === 'final' && <p className="mute">Final = media ponderada de las evaluaciones con datos. * provisional. ! algún instrumento bajo el mínimo (en rojo).</p>}
+      {view === 'final' && <p className="mute">Final = media ponderada de las evaluaciones con datos. * provisional. ! alguna parte ({partLabel}) bajo el aprobado (en rojo).</p>}
     </div>
   );
 }

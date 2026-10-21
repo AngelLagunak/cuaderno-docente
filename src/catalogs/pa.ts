@@ -186,7 +186,9 @@ const subject: Subject = {
     { id: 't2', name: '2.ª evaluación', weight: 30 },
     { id: 't3', name: '3.ª evaluación', weight: 40 },
   ],
-  config: { passMark: 5, termDecimals: 2, finalDecimals: 0, minPerInstrument: true, latePenaltyPct: 0, absenceWarnPct: 20 },
+  // Nota de cada evaluación: media de las competencias específicas; los instrumentos (45/25/15/15) ponderan las
+  // medidas de cada criterio. Final 30/30/40, entera.
+  config: { passMark: 5, termDecimals: 2, finalDecimals: 0, minPerInstrument: true, latePenaltyPct: 0, absenceWarnPct: 20, gradeLevel: 'ce' },
 };
 
 export const pa = { subject, nodes, links };

@@ -50,12 +50,11 @@ const subject: Subject = {
     { id: 'proy', name: 'Proyectos personales', weight: 30 },
     { id: 'expo', name: 'Exposiciones, memorias y dossier', weight: 10 },
   ],
-  // Pesos de evaluación no indicados en la programación: provisional 50/50.
   terms: [
     { id: 't1', name: '1.ª evaluación', weight: 50 },
     { id: 't2', name: '2.ª evaluación', weight: 50 },
   ],
-  config: { passMark: 5, termDecimals: 1, finalDecimals: 1, minPerInstrument: false, latePenaltyPct: 30, absenceWarnPct: 20, annualSessions: 54 },
+  config: { passMark: 5, termDecimals: 1, finalDecimals: 1, minPerInstrument: false, latePenaltyPct: 30, absenceWarnPct: 20, annualSessions: 54, gradeLevel: null },
 };
 
 export const mm = { subject, nodes, links: [] };

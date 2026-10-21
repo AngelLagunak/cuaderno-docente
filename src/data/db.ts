@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import { linkId } from '../core/model';
 import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, Stamp, Student, Subject } from '../core/model';
 import { catalogs } from '../catalogs';
+import { migrateSubject } from '../core/curriculum';
 
 class DB extends Dexie {
   subjects!: Table<Subject, string>;
@@ -40,6 +41,10 @@ export const db = new DB();
 
 /** Carga los catálogos la primera vez. No sobrescribe materias ya existentes. */
 export async function seed() {
+  for (const s of await db.subjects.toArray()) {
+    const m = migrateSubject(s);
+    if (m) await saveSubject(m);
+  }
   for (const c of catalogs) {
     if (await db.subjects.get(c.subject.id)) continue;
     await db.transaction('rw', db.subjects, db.nodes, db.links, async () => {

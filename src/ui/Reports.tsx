@@ -11,6 +11,8 @@ const fmt = (v: Num, d: number) => (v == null ? '—' : v.toFixed(d).replace('.'
 const tick = { fill: 'currentColor', fontSize: 11 };
 
 type Axis = { id: string; axis: string; title: string; v: Num };
+type Series = { key: string; name: string; axes: Axis[] };
+const COLORS = ['#2d4a7a', '#e08a1e', '#2e7d4f', '#9c3d8f', '#b54708'];
 
 export function Reports({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
@@ -21,7 +23,8 @@ export function Reports({ subject }: { subject: Subject }) {
   const [sid, setSid] = useState('');
   const [periodId, setPeriodId] = useState('');
   const [axisKey, setAxisKey] = useState('');
-  const [cmp, setCmp] = useState(true);
+  const [cmp, setCmp] = useState<'none' | 'group' | 'terms'>('group');
+  const [gTerms, setGTerms] = useState(false);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = useMemo(() => (stRaw ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es')), [stRaw]);
@@ -54,10 +57,12 @@ export function Reports({ subject }: { subject: Subject }) {
   const effKey = axisKey || axisOpts.find((o) => hasData(o.key))?.key || axisOpts[0]?.key || '';
 
   // media del grupo por eje
-  const groupAxes = (k: string): Axis[] => {
-    const per = rows.map((r) => axesOf(r.prof, k));
+  const meanAxes = (profs: Profile[], k: string): Axis[] => {
+    const per = profs.map((p) => axesOf(p, k));
     return (per[0] ?? []).map((a, i) => ({ ...a, v: wmean(per.map((x): [Num, number] => [x[i].v, 1])) }));
   };
+  const groupAxes = (k: string) => meanAxes(rows.map((r) => r.prof), k);
+  const withData = (s: Series) => s.axes.some((a) => a.v != null);
 
   if (!group) return <p className="mute">Crea un grupo y alumnos en la pestaña Grupos.</p>;
   const student = students.find((s) => s.id === sid) ?? students[0];
@@ -65,20 +70,40 @@ export function Reports({ subject }: { subject: Subject }) {
   const nodeCode = (id: string) => nodes.find((n) => n.id === id)?.code ?? '?';
   const termName = (id: string) => subject.terms.find((t) => t.id === id)?.name ?? '';
 
-  const radar = (data: Record<string, unknown>[], series: [string, string, string][]) => (
-    <div style={{ width: '100%', height: 320 }}>
-      <ResponsiveContainer>
-        <RadarChart data={data} outerRadius="70%">
-          <PolarGrid />
-          <PolarAngleAxis dataKey="axis" tick={tick} />
-          <PolarRadiusAxis domain={[0, 10]} tick={tick} />
-          {series.map(([k, name, color]) => <Radar key={k} name={name} dataKey={k} stroke={color} fill={color} fillOpacity={0.25} />)}
-          <Tooltip />
-          <Legend />
-        </RadarChart>
-      </ResponsiveContainer>
-    </div>
-  );
+  /** Radar con una serie por alumno, grupo o evaluación, y tabla con los valores ("Sin evaluar" en vez de 0). */
+  const chart = (series: Series[]) => {
+    const base = series[0]?.axes ?? [];
+    const data = base.map((a, i) => ({ axis: a.axis, ...Object.fromEntries(series.map((x) => [x.key, x.axes[i]?.v ?? 0])) }));
+    return (
+      <>
+        <div style={{ width: '100%', height: 320 }}>
+          <ResponsiveContainer>
+            <RadarChart data={data} outerRadius="70%">
+              <PolarGrid />
+              <PolarAngleAxis dataKey="axis" tick={tick} />
+              <PolarRadiusAxis domain={[0, 10]} tick={tick} />
+              {series.map((x, i) => <Radar key={x.key} name={x.name} dataKey={x.key} stroke={COLORS[i % COLORS.length]} fill={COLORS[i % COLORS.length]} fillOpacity={0.2} isAnimationActive={false} />)}
+              <Tooltip />
+              <Legend />
+            </RadarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="tw">
+          <table className="t c">
+            <thead><tr><th>Eje</th>{series.map((x) => <th key={x.key}>{x.name}</th>)}</tr></thead>
+            <tbody>
+              {base.map((a, i) => (
+                <tr key={a.id}>
+                  <td title={a.title} className="wrap"><b>{a.axis}</b> <span className="mute">{a.title.slice(0, 40)}{a.title.length > 40 ? '…' : ''}</span></td>
+                  {series.map((x) => { const v = x.axes[i]?.v ?? null; return <td key={x.key} className={v == null ? 'mute' : ''}>{v == null ? 'Sin evaluar' : fmt(round(v, 2), 2)}</td>; })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  };
 
   const periodSel = (
     <select value={periodId} onChange={(e) => setPeriodId(e.target.value)}>
@@ -105,18 +130,21 @@ export function Reports({ subject }: { subject: Subject }) {
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}
 
       {students.length > 0 && view === 'student' && student && sr && (() => {
-        const axes = axesOf(sr.prof, effKey);
-        const gAxes = groupAxes(effKey);
-        const data = axes.map((a, i) => ({ axis: a.axis, alumno: a.v ?? 0, grupo: gAxes[i]?.v ?? 0 }));
-        const missing = axes.filter((a) => a.v == null).map((a) => a.axis);
+        const series: Series[] = cmp === 'terms'
+          ? subject.terms.map((t) => ({ key: t.id, name: t.name, axes: axesOf(profile(subject, nodes, links, acts, sr.m, t.id), effKey) })).filter(withData)
+          : [{ key: 'alumno', name: 'Alumno', axes: axesOf(sr.prof, effKey) }, ...(cmp === 'group' ? [{ key: 'grupo', name: 'Media del grupo', axes: groupAxes(effKey) }] : [])];
         return (
           <div>
             <div className="row noprint">
               <select value={student.id} onChange={(e) => setSid(e.target.value)}>
                 {students.map((s) => <option key={s.id} value={s.id}>{s.lastName}, {s.firstName}</option>)}
               </select>
-              {periodSel}{axisSel}
-              <label><input type="checkbox" style={{ width: 'auto' }} checked={cmp} onChange={(e) => setCmp(e.target.checked)} /> Media del grupo</label>
+              {cmp !== 'terms' && periodSel}{axisSel}
+              <select value={cmp} onChange={(e) => setCmp(e.target.value as typeof cmp)}>
+                <option value="none">Sin comparar</option>
+                <option value="group">Comparar con la media del grupo</option>
+                <option value="terms">Comparar evaluaciones</option>
+              </select>
             </div>
             <div className="card">
               <h3 style={{ marginTop: 0 }}>{student.firstName} {student.lastName}</h3>
@@ -143,12 +171,9 @@ export function Reports({ subject }: { subject: Subject }) {
             </div>
 
             <div className="card">
-              <b>Perfil competencial</b> <span className="mute">{periodId ? termName(periodId) : 'todo el curso'}</span>
-              {data.some((d) => d.alumno > 0) ? (
-                <>
-                  {radar(data, [['alumno', 'Alumno', '#2d4a7a'], ...(cmp ? [['grupo', 'Grupo', '#e08a1e'] as [string, string, string]] : [])])}
-                  {missing.length > 0 && <p className="mute">Sin evaluar: {missing.join(', ')}</p>}
-                </>
+              <b>Perfil competencial</b> <span className="mute">{cmp === 'terms' ? 'por evaluación' : periodId ? termName(periodId) : 'todo el curso'}</span>
+              {series.length > 0 && withData(series[0]) ? (
+                chart(series)
               ) : (
                 <p className="mute">Sin datos. El perfil sale de las actividades que tienen elementos curriculares vinculados y calificados.</p>
               )}
@@ -193,15 +218,19 @@ export function Reports({ subject }: { subject: Subject }) {
           name: t.name,
           media: wmean(rows.map((r): [Num, number] => [r.fin.terms[i].result.value, 1])),
         }));
-        const axes = groupAxes(effKey);
-        const gdata = axes.map((a) => ({ axis: a.axis, grupo: a.v ?? 0 }));
+        const gSeries: Series[] = gTerms
+          ? subject.terms.map((t) => ({ key: t.id, name: t.name, axes: meanAxes(rows.map((r) => profile(subject, nodes, links, acts, r.m, t.id)), effKey) })).filter(withData)
+          : [{ key: 'grupo', name: 'Media del grupo', axes: groupAxes(effKey) }];
         const graded = new Set(subject.levels.filter((l) => l.graded).map((l) => l.key));
         const nodeMeans = nodes.filter((n) => graded.has(n.level)).map((n) => ({
           n, v: wmean(rows.map((r): [Num, number] => [r.prof.nodes.get(n.id) ?? null, 1])),
         })).filter((x) => x.v != null).sort((a, b) => (b.v as number) - (a.v as number));
         return (
           <div>
-            <div className="row noprint">{periodSel}{axisSel}</div>
+            <div className="row noprint">
+              {!gTerms && periodSel}{axisSel}
+              <label><input type="checkbox" style={{ width: 'auto' }} checked={gTerms} onChange={(e) => setGTerms(e.target.checked)} /> Comparar evaluaciones</label>
+            </div>
             <div className="card">
               <b>{group.name}</b> · {fv.length} de {students.length} alumnos con nota final
               <p>Media: <b>{fmt(round(mean, 2), 2)}</b> · Aprobados: <b>{pass}</b> · Suspensos: <b>{fv.length - pass}</b></p>
@@ -222,8 +251,8 @@ export function Reports({ subject }: { subject: Subject }) {
               </div>
             </div>
             <div className="card">
-              <b>Perfil del grupo</b>
-              {gdata.some((d) => d.grupo > 0) ? radar(gdata, [['grupo', 'Media del grupo', '#2d4a7a']]) : <p className="mute">Sin datos competenciales.</p>}
+              <b>Perfil del grupo</b> <span className="mute">{gTerms ? 'por evaluación' : periodId ? termName(periodId) : 'todo el curso'}</span>
+              {gSeries.length > 0 && withData(gSeries[0]) ? chart(gSeries) : <p className="mute">Sin datos competenciales.</p>}
             </div>
             {nodeMeans.length > 0 && (
               <div className="card">

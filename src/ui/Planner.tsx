@@ -226,7 +226,7 @@ export function Planner({ subject }: { subject: Subject }) {
       {cov.length > 0 && (
         <details className="card">
           <summary>Cobertura: criterio × instrumento ({cov.filter((c) => c.total === 0).length} sin actividades)</summary>
-          <p className="mute">Unidades y actividades del grupo seleccionado que evalúan cada elemento, por instrumento. Una actividad que evalúa un indicador cuenta también para su criterio.</p>
+          <p className="mute">Unidades y actividades del grupo seleccionado que evalúan cada elemento, por instrumento. Una actividad que evalúa una concreción cuenta también para su criterio.</p>
           <div className="tw">
             <table className="t c">
               <thead>

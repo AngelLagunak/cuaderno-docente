@@ -165,7 +165,7 @@ const subject: Subject = {
   levels: [
     { key: 'ce', label: 'Competencia específica', plural: 'Competencias específicas' },
     { key: 'crit', label: 'Criterio de evaluación', plural: 'Criterios', graded: true },
-    { key: 'ind', label: 'Indicador', plural: 'Indicadores', graded: true },
+    { key: 'ind', label: 'Concreción', plural: 'Concreciones', graded: true },
     { key: 'desc', label: 'Descriptor operativo', plural: 'Descriptores' },
     { key: 'saber', label: 'Saber básico', plural: 'Saberes' },
   ],

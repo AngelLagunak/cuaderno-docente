@@ -27,7 +27,23 @@ export function review(subject: Subject, nodes: CNode[], links: CLink[]): Issue[
   return issues;
 }
 
-/** Niveles que se califican (criterio, indicador, aspecto…). */
+/**
+ * Cambios de nombre en materias ya guardadas. «Indicador» pasa a «Concreción» (así lo llama la programación),
+ * para no confundirlo con los indicadores de logro. Devuelve la materia cambiada o null si no hay nada que hacer.
+ */
+export function migrateSubject(s: Subject): Subject | null {
+  let changed = false;
+  const levels = s.levels.map((l) => {
+    if (l.key === 'ind' && l.label === 'Indicador' && l.plural === 'Indicadores') {
+      changed = true;
+      return { ...l, label: 'Concreción', plural: 'Concreciones' };
+    }
+    return l;
+  });
+  return changed ? { ...s, levels } : null;
+}
+
+/** Niveles que se califican (criterio, concreción, aspecto…). */
 export const gradedLevels = (subject: Subject) => new Set(subject.levels.filter((l) => l.graded).map((l) => l.key));
 
 /** Actividades que no evalúan ningún elemento calificable: no aportan al perfil ni admiten nota por criterio. */
@@ -47,7 +63,7 @@ export interface CoverageRow {
 
 /**
  * Cobertura de cada elemento calificable: unidades que lo incluyen y actividades por instrumento.
- * Una actividad que evalúa un indicador también cubre su criterio.
+ * Una actividad que evalúa una concreción también cubre su criterio.
  */
 export function coverage(subject: Subject, nodes: CNode[], links: CLink[], units: LearningUnit[], activities: Activity[]): CoverageRow[] {
   const graded = gradedLevels(subject);

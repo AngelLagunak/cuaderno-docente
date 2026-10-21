@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { callScript } from '../data/api';
-import { useGroups } from './hooks';
-import { finalResult, indexGrades, noGrades, round } from '../core/evaluation';
+import { useGroups, useNodes } from './hooks';
+import { finalResult, indexGrades, noGrades, profile, round } from '../core/evaluation';
+import { criteriaText } from '../core/report';
 import type { Student, Subject, Template } from '../core/model';
 
 const DEFAULTS: Omit<Template, 'updatedAt'>[] = [
@@ -12,13 +13,15 @@ const DEFAULTS: Omit<Template, 'updatedAt'>[] = [
   { id: 'def-entrega', name: 'Entrega pendiente', subject: 'Entrega pendiente – {{materia}}',
     body: 'Hola {{nombre}},\n\nTienes trabajos pendientes de entrega en {{materia}}. Revisa Classroom y entrégalos lo antes posible.\n\nUn saludo.' },
   { id: 'def-eval', name: 'Resultado de evaluación', subject: 'Resultado de evaluación – {{materia}}',
-    body: 'Hola {{nombre}},\n\nTu nota actual en {{materia}} es {{nota}}.\n\nUn saludo.' },
+    body: 'Hola {{nombre}},\n\nTu nota actual en {{materia}} es {{nota}}.\n\nCriterios evaluados:\n{{criterio}}\n\nUn saludo.' },
 ];
 
 const render = (t: string, v: Record<string, string>) => t.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => v[k] ?? '');
 
 export function Comms({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
+  const nodes = useNodes(subject.id);
+  const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
   const [gid, setGid] = useState('');
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const tplRaw = useLiveQuery(() => db.templates.toArray());
@@ -51,11 +54,14 @@ export function Comms({ subject }: { subject: Subject }) {
   const vars = (s: Student): Record<string, string> => {
     const sg = indexGrades((grRaw ?? []).filter((x) => x.studentId === s.id)).get(s.id) ?? noGrades();
     const f = finalResult(subject, acts, sg);
+    const prof = profile(subject, nodes, lkRaw ?? [], acts, sg);
     const faltas = (attRaw ?? []).filter((r) => !r.deleted && r.studentId === s.id && r.status === 'A').length;
     return {
       nombre: s.firstName, apellidos: s.lastName, grupo: group?.name ?? '', materia: subject.name,
       nota: f.value == null ? 'sin calificar' : String(round(f.value, subject.config.termDecimals)).replace('.', ','),
       faltas: String(faltas),
+      criterio: criteriaText(subject, nodes, prof),
+      criterios_pendientes: criteriaText(subject, nodes, prof, true),
     };
   };
 
@@ -132,7 +138,8 @@ export function Comms({ subject }: { subject: Subject }) {
         </div>
         <input placeholder={kind === 'mail' ? 'Asunto' : 'Título (opcional)'} value={subj} onChange={(e) => setSubj(e.target.value)} />
         <textarea rows={6} placeholder="Mensaje" value={body} onChange={(e) => setBody(e.target.value)} />
-        <p className="mute">Marcadores: {'{{nombre}} {{apellidos}} {{grupo}} {{materia}} {{nota}} {{faltas}}'}</p>
+        <p className="mute">Marcadores: {'{{nombre}} {{apellidos}} {{grupo}} {{materia}} {{nota}} {{faltas}} {{criterio}} {{criterios_pendientes}}'}</p>
+        <p className="mute">{'{{criterio}}'}: una línea por criterio evaluado con su nota (todo el curso). {'{{criterios_pendientes}}'}: solo los que no llegan al aprobado.</p>
       </div>
 
       <div className="card">

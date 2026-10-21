@@ -4,6 +4,7 @@ import { db, softDelete, uid } from '../data/db';
 import { useGroups, useNodes } from './hooks';
 import { NodePicker } from './NodePicker';
 import { Rubrics } from './Rubrics';
+import { Calendar } from './Calendar';
 import { callScript } from '../data/api';
 import type { CWork } from '../data/api';
 import { activitiesWithoutItems, coverage } from '../core/curriculum';
@@ -219,8 +220,18 @@ export function Planner({ subject }: { subject: Subject }) {
   const newUnit = () => setEu({ id: uid(), subjectId: subject.id, code: `UD${units.length + 1}`, title: '', termId: subject.terms[0]?.id ?? '', plannedSessions: 0, nodeIds: [], updatedAt: Date.now() });
   const newAct = () => setEa({ id: uid(), subjectId: subject.id, groupId: group!.id, termId: subject.terms[0]?.id ?? '', instrumentId: subject.instruments[0]?.id ?? '', title: '', weight: 1, nodeIds: [], updatedAt: Date.now() });
 
+  const [view, setView] = useState<'plan' | 'cal'>('plan');
+  const tabs = (
+    <div className="row">
+      <button className={view === 'plan' ? 'on' : ''} onClick={() => setView('plan')}>Unidades y actividades</button>
+      <button className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>Calendario</button>
+    </div>
+  );
+  if (view === 'cal') return <div>{tabs}<Calendar subject={subject} groups={groups} units={units} acts={actsRaw ?? []} /></div>;
+
   return (
     <div>
+      {tabs}
       <h3>Unidades didácticas</h3>
       {units.map((u) => (
         eu?.id === u.id ? null : (

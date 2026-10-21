@@ -117,3 +117,9 @@ El servidor también elimina de `cuaderno-docente-db.json` los borrados de hace 
 En **Currículo**:
 - **Matriz**: elige una relación (p. ej. competencias específicas → descriptores); filas de un nivel, columnas del otro, una casilla por vínculo. En naranja, elementos sin vínculo que deberían tenerlo.
 - **Mapa**: columnas de tarjetas según la cadena (concreciones y saberes → criterios → competencias específicas → descriptores → competencias clave). Pulsa una tarjeta para ver solo su cadena. Arrastra de un punto a otro para vincular; selecciona una línea y pulsa «Quitar vínculo» (o Supr).
+
+## Calendario de sesiones (Fase 16)
+**Planificador → Calendario**:
+- **Generar sesiones**: marca tus horas con el grupo (lunes 3.ª, miércoles 1.ª…), elige fechas y escribe festivos y vacaciones (una fecha o «inicio..fin» por línea). Se guardan en el grupo para la próxima vez.
+- **Repartir unidades**: asigna las unidades por orden a las sesiones libres según sus sesiones previstas.
+- Vista por semanas: unidad y tema de cada sesión, y las actividades con esa fecha. «Sesiones por unidad» compara previstas y programadas.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activitiesWithoutItems, coverage, review } from './curriculum';
+import { activitiesWithoutItems, chainOf, coverage, levelColumns, relationFor, review } from './curriculum';
 import type { Activity, LearningUnit } from './model';
 import { pa } from '../catalogs/pa';
 import { mm } from '../catalogs/mm';
@@ -78,5 +78,27 @@ describe('coverage', () => {
     expect(rows.has('CE.PA.1')).toBe(false);
     expect(rows.get('5.4')!.total).toBe(0);
     expect(rows.size).toBe(15 + 29);
+  });
+});
+
+describe('mapa de relaciones', () => {
+  it('ordena los niveles en columnas según la cadena', () => {
+    expect(levelColumns(pa.subject)).toEqual([['ind', 'saber'], ['crit'], ['ce'], ['desc']]);
+    expect(levelColumns(mm.subject)).toEqual([['aspecto']]);
+  });
+  it('la cadena de un criterio llega a sus concreciones, saberes, CE y descriptores, sin hermanos', () => {
+    const c = chainOf('pa-1bach/crit:1.1', pa.links);
+    for (const id of ['pa-1bach/ind:1.1.1', 'pa-1bach/saber:PART.A.1', 'pa-1bach/ce:CE.PA.1', 'pa-1bach/desc:CCL1']) expect(c.has(id)).toBe(true);
+    expect(c.has('pa-1bach/crit:1.2')).toBe(false); // hermano (misma CE)
+    expect(c.has('pa-1bach/ind:1.2.1')).toBe(false);
+  });
+  it('ignora enlaces borrados', () => {
+    const links = pa.links.map((l) => (l.relation === 'crit-ce' && l.fromId === 'pa-1bach/crit:1.1' ? { ...l, deleted: true } : l));
+    expect(chainOf('pa-1bach/crit:1.1', links).has('pa-1bach/ce:CE.PA.1')).toBe(false);
+  });
+  it('encuentra la relación para unir dos niveles en cualquier orden', () => {
+    expect(relationFor(pa.subject, 'crit', 'ce')).toEqual({ key: 'crit-ce', reversed: false });
+    expect(relationFor(pa.subject, 'ce', 'crit')).toEqual({ key: 'crit-ce', reversed: true });
+    expect(relationFor(pa.subject, 'ind', 'desc')).toBeNull();
   });
 });

@@ -112,3 +112,8 @@ El servidor también elimina de `cuaderno-docente-db.json` los borrados de hace 
 - **Exportar Excel**: hoja «Notas» (actividades, evaluaciones, ordinaria, vía y nota oficial) y hoja «Criterios» (competencias específicas, criterios y concreciones de todo el curso).
 - **↶ Deshacer**: deshace los últimos cambios de notas de esta sesión (también importaciones, recuperaciones y notas traídas de Classroom, de una vez).
 - Los borrados de hace más de 60 días se eliminan del dispositivo (si ya se enviaron al servidor) y del archivo de Drive.
+
+## Matriz y mapa del currículo (Fase 15)
+En **Currículo**:
+- **Matriz**: elige una relación (p. ej. competencias específicas → descriptores); filas de un nivel, columnas del otro, una casilla por vínculo. En naranja, elementos sin vínculo que deberían tenerlo.
+- **Mapa**: columnas de tarjetas según la cadena (concreciones y saberes → criterios → competencias específicas → descriptores → competencias clave). Pulsa una tarjeta para ver solo su cadena. Arrastra de un punto a otro para vincular; selecciona una línea y pulsa «Quitar vínculo» (o Supr).

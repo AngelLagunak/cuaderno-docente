@@ -61,3 +61,12 @@ table.t td.wrap { white-space:normal; min-width:130px; max-width:200px; }
   .wrap { max-width:none; padding:0; }
 }
 .recm { display:inline-block; font-size:.65rem; font-weight:700; color:var(--brand); border:1px solid var(--brand); border-radius:4px; padding:0 3px; margin-left:2px; vertical-align:super; }
+table.mx td, table.mx th { padding:2px 3px; }
+table.mx input { width:auto; margin:0; }
+td.mxon { background:var(--chip); }
+.vert { writing-mode:vertical-rl; transform:rotate(180deg); display:inline-block; }
+.map { height:70vh; min-height:420px; border:1px solid var(--line); border-radius:12px; background:var(--card); }
+.mapcard { width:240px; font-size:.75rem; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink); }
+.mapcard b { color:var(--brand); }
+.mapcard.dim { opacity:.25; }
+.mapcard.hit { border-color:var(--brand); box-shadow:0 0 0 2px var(--brand); }

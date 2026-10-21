@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Cell, RecMark, fmt, parse, raw } from './cells';
 import { FinalView } from './FinalView';
 import { canImprove, outcome, scaleLabel } from '../core/rules';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, saveGrade, saveItemGrade } from '../data/db';
-import { callScript } from '../data/api';
-import type { CGrades } from '../data/api';
+import { configured } from '../data/sync';
+import { applyPending, describe, pullActivity, pullGroup } from '../data/classroomSync';
+import type { PullResult } from '../data/classroomSync';
+import { PushGrades, RubricMap } from './ClassroomPanel';
 import { useGroups, useNodes } from './hooks';
 import { activityBase, activityValue, indexGrades, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
 import type { Num, StudentGrades } from '../core/evaluation';
@@ -106,43 +108,47 @@ export function Notebook({ subject }: { subject: Subject }) {
     a.click();
   }
 
-  if (!group) return <p className="mute">Crea un grupo y alumnos en la pestaña Grupos.</p>;
 
+  /** Pregunta si sobrescribir las notas cambiadas en la app y muestra el resumen. */
+  async function finish(r: PullResult, extra = '') {
+    if (r.conflicts.length && confirm(`${r.conflicts.length} notas de Classroom son distintas a las que cambiaste en la app. ¿Sobrescribir con las de Classroom?`)) {
+      await applyPending(r.conflicts);
+      r = { ...r, applied: r.applied + r.conflicts.length, conflicts: [] };
+    }
+    setMsg(describe(r, extra));
+  }
   async function pullGrades() {
-    if (!act?.classroomWorkId || !group?.classroomCourseId) return;
+    if (!act || !group) return;
     setBusy(true); setMsg('Consultando Classroom…');
+    try { await finish(await pullActivity(subject, act, group)); }
+    catch (e) { setMsg('Error: ' + (e as Error).message); }
+    finally { setBusy(false); }
+  }
+  async function pullAll(silent = false) {
+    if (!group?.classroomCourseId) return;
+    if (!silent) { setBusy(true); setMsg('Consultando Classroom…'); }
     try {
-      const r = await callScript<CGrades>('classroom.grades', { courseId: group.classroomCourseId, courseWorkId: act.classroomWorkId });
-      const max = r.maxPoints ?? act.maxPoints;
-      if (!max) throw new Error('La tarea no tiene puntuación máxima en Classroom.');
-      const byUser = new Map(students.filter((s) => s.classroomUserId).map((s) => [s.classroomUserId!, s]));
-      const fresh: [Student, number | null, Grade['rubric']][] = [];
-      const changed: [Student, number | null, Grade['rubric']][] = [];
-      let unmatched = 0;
-      for (const sub of r.submissions) {
-        const st = byUser.get(sub.userId);
-        if (!st) { unmatched++; continue; }
-        const pts = sub.assignedGrade ?? sub.draftGrade;
-        const v = pts == null ? null : Math.round((pts / max) * 1000) / 100;
-        if (v == null && !sub.rubricGrades.length) continue;
-        const cur = sgOf(st).byActivity.get(act.id)?.value ?? null;
-        (cur == null || v == null || cur === v ? fresh : changed).push([st, v, sub.rubricGrades.length ? sub.rubricGrades : undefined]);
-      }
-      const overwrite = changed.length > 0 && confirm(`${changed.length} alumnos ya tienen una nota distinta. ¿Sobrescribir con la de Classroom?`);
-      for (const [st, v, rb] of [...fresh, ...(overwrite ? changed : [])]) {
-        await saveGrade(st.id, act.id, { ...(v != null ? { value: v } : {}), ...(rb ? { rubric: rb } : {}) });
-      }
-      if (r.rubric || act.maxPoints !== max) await db.activities.put({ ...act, maxPoints: max, ...(r.rubric ? { rubric: r.rubric } : {}), updatedAt: Date.now() });
-      setMsg(`Importadas ${fresh.length + (overwrite ? changed.length : 0)} notas` +
-        (changed.length && !overwrite ? `, ${changed.length} distintas sin sobrescribir` : '') +
-        (unmatched ? `, ${unmatched} alumnos de Classroom sin coincidencia (importa antes los alumnos)` : '') +
-        (r.rubric ? '. Rúbrica incluida.' : r.rubricError ? `. Rúbrica no disponible: ${r.rubricError}` : '. La tarea no tiene rúbrica.'));
+      const r = await pullGroup(subject, group, acts);
+      localStorage.setItem('clsPull:' + group.id, String(Date.now()));
+      if (silent) {
+        if (r.applied || r.conflicts.length) setMsg(describe(r, ` (${r.count} tareas)`) + (r.conflicts.length ? '. Pulsa «Classroom ⟳» para revisarlas.' : ''));
+      } else await finish(r, ` (${r.count} tareas)`);
     } catch (e) {
-      setMsg('Error: ' + (e as Error).message);
+      if (!silent) setMsg('Error: ' + (e as Error).message);
     } finally {
-      setBusy(false);
+      if (!silent) setBusy(false);
     }
   }
+  // Al abrir el cuaderno con conexión, trae los cambios de Classroom (como mucho cada 30 min), sin pisar lo cambiado aquí.
+  const linked = acts.filter((a) => a.classroomWorkId).length;
+  useEffect(() => {
+    if (!group?.classroomCourseId || !linked || !configured() || !navigator.onLine) return;
+    if (Date.now() - Number(localStorage.getItem('clsPull:' + group.id) || 0) < 30 * 60_000) return;
+    pullAll(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group?.id, linked]);
+
+  if (!group) return <p className="mute">Crea un grupo y alumnos en la pestaña Grupos.</p>;
 
   const LateBtn = ({ s, a }: { s: Student; a: Activity }) => {
     const g = sgOf(s).byActivity.get(a.id);
@@ -195,8 +201,10 @@ export function Notebook({ subject }: { subject: Subject }) {
         <button className={view === 'act' ? 'on' : ''} onClick={() => setView('act')}>Por actividad</button>
         <button className={view === 'final' ? 'on' : ''} onClick={() => setView('final')}>Final</button>
         <button className="small" onClick={exportCsv}>Exportar CSV</button>
+        {group.classroomCourseId && linked > 0 && <button className="small" disabled={busy} onClick={() => pullAll()} title="Traer notas y rúbricas de todas las tareas vinculadas">Classroom ⟳</button>}
       </div>
 
+      {msg && <p className="mute">{msg}</p>}
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}
       {students.length > 0 && acts.length === 0 && <p className="mute">Crea actividades en el Planificador.</p>}
 
@@ -260,9 +268,12 @@ export function Notebook({ subject }: { subject: Subject }) {
             <p className="mute warn">Esta actividad no tiene criterios: solo admite nota global y no aporta al perfil competencial. Añádelos en el Planificador.</p>
           )}
           {act.classroomWorkId && group.classroomCourseId && (
-            <div className="row"><button className="small" disabled={busy} onClick={pullGrades}>Traer notas de Classroom</button></div>
+            <div className="row">
+              <button className="small" disabled={busy} onClick={pullGrades}>Traer notas de Classroom</button>
+              <PushGrades act={act} group={group} students={students} grades={grRaw ?? []} onMsg={setMsg} />
+            </div>
           )}
-          {msg && <p className="mute">{msg}</p>}
+          {act.rubric && <RubricMap key={act.id + (act.updatedAt ?? 0)} subject={subject} act={act} nodes={nodes} onResult={(r) => finish(r, ' con el nuevo emparejamiento')} />}
           {students.map((s) => {
             const g = sgOf(s).byActivity.get(act.id);
             const its = items ? actItems(act) : [];

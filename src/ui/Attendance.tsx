@@ -131,8 +131,10 @@ export function Attendance({ subject, preset }: { subject: Subject; preset?: { d
   return (
     <div>
       <div className="row">
+        <div className="seg" role="group" aria-label="Vista">
         <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')}>Pasar lista</button>
         <button className={view === 'sum' ? 'on' : ''} onClick={() => setView('sum')}>Resumen</button>
+      </div>
       </div>
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}
 

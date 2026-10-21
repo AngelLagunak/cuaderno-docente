@@ -124,8 +124,10 @@ export function Reports({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row noprint">
+        <div className="seg" role="group" aria-label="Vista">
         <button className={view === 'student' ? 'on' : ''} onClick={() => setView('student')}>Alumno</button>
         <button className={view === 'group' ? 'on' : ''} onClick={() => setView('group')}>Grupo</button>
+      </div>
         <button className="small" onClick={() => window.print()}>Imprimir / PDF</button>
       </div>
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}

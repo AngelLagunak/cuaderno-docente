@@ -116,6 +116,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
   return (
     <div>
       <div className="row">
+        <div className="seg" role="group" aria-label="Vista">
         <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>Elementos</button>
         <button className={view === 'matrix' ? 'on' : ''} onClick={() => setView('matrix')}>Matriz</button>
         <button className={view === 'map' ? 'on' : ''} onClick={() => setView('map')}>Mapa</button>
@@ -124,6 +125,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
         </button>
         <button className={view === 'obj' ? 'on' : ''} onClick={() => setView('obj')}>Objetivos</button>
         <button className={view === 'versions' ? 'on' : ''} onClick={() => setView('versions')}>Versiones</button>
+      </div>
       </div>
 
       {view === 'obj' ? (

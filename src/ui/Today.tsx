@@ -85,6 +85,7 @@ export function Today({ nav }: { nav: TodayNav }) {
       </div>
       {date !== today && <div className="row center"><button className="small" onClick={() => { setDate(today); setPick(null); }}>Volver a hoy</button></div>}
 
+      <div className="todayGrid"><div>
       {classes.length > 0 ? (
         <>
           <div className="pills" role="group" aria-label="Clases del día">
@@ -105,6 +106,7 @@ export function Today({ nav }: { nav: TodayNav }) {
         </div>
       )}
 
+      </div><div>
       <h2 className="sec">Por corregir</h2>
       {pending.length ? (
         <div className="card list">
@@ -129,6 +131,7 @@ export function Today({ nav }: { nav: TodayNav }) {
           </div>
         </>
       )}
+      </div></div>
     </div>
   );
 }

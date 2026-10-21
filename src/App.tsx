@@ -88,7 +88,7 @@ export function App() {
         {SECTIONS.map((s) => (
           <div key={s.title} className="sidegroup">
             <span>{s.title}</span>
-            {s.items.map(([v, l]) => <button key={v} aria-current={view === v ? 'page' : undefined} onClick={() => go(v)}>{l}</button>)}
+            {s.items.filter(([v]) => v !== 'seg').map(([v, l]) => <button key={v} aria-current={view === v ? 'page' : undefined} onClick={() => go(v)}>{l}</button>)}
           </div>
         ))}
       </nav>

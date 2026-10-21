@@ -160,3 +160,8 @@ En **Currículo**:
 En Planificar → «Seguimiento ›», en el Cuaderno → «Resultados ›» o en el menú lateral:
 - **Programación**: sesiones impartidas, si vas por detrás o con margen en la evaluación actual (sesiones que faltan de sus unidades frente a las que quedan en el calendario hasta su fin), asistencia media, avance de cada unidad (impartidas / previstas; aviso si faltan sesiones en el calendario) y cuántas sesiones dejaron algo pendiente y qué se repite más.
 - **Resultados** por evaluación: media, aprobados, notas sin poner, reparto de notas y media del grupo por competencia específica (o instrumento) con cuántos están por debajo del aprobado.
+
+## Ordenador (Fase 23)
+- Hoy en dos columnas: la clase a la izquierda; lo que falta por corregir y los avisos a la derecha.
+- Cuaderno: en pantallas anchas, las acciones (Classroom, importar, exportar, SIGAD) se ven directamente en lugar del menú ⋯.
+- Pestañas internas (Asistencia, Planificar, Currículo, Informes) con el mismo control segmentado que el resto.

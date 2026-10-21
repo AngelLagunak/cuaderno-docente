@@ -226,3 +226,13 @@ h2.h2 { margin:0 0 10px; font-size:1rem; }
 .partsTable td:nth-child(2) { width:60%; }
 .hbar { display:flex; align-items:center; gap:10px; }
 .hbar b { min-width:34px; text-align:right; }
+
+/* ---------- Ordenador ---------- */
+.wideOnly { display:none; gap:6px; flex-wrap:wrap; }
+@media (min-width: 1100px) {
+  .wideOnly { display:inline-flex; }
+  .narrowOnly { display:none; }
+  .today { max-width:none; }
+  .todayGrid { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:24px; align-items:start; }
+  .todayGrid h2.sec:first-child { margin-top:8px; }
+}

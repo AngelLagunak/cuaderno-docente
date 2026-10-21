@@ -254,7 +254,8 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
         )}
         <span className="grow" />
         {undoLabel && <button className="small" onClick={async () => setMsg(`Deshecho: ${await undo()}.`)} title="Deshace el último cambio de notas de esta sesión">↶ Deshacer</button>}
-        <Menu items={menu} />
+        <span className="wideOnly">{menu.map(([l, f, dis]) => <button key={l} className="small" disabled={dis} onClick={f}>{l.replace(' (CSV o Excel)', '').replace('Notas para ', '')}</button>)}</span>
+        <span className="narrowOnly"><Menu items={menu} /></span>
       </div>
 
       {msg && <p className="mute">{msg}</p>}

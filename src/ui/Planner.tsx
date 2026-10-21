@@ -228,9 +228,11 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
   const [view, setView] = useState<'plan' | 'cal'>('plan');
   const tabs = (
     <div className="row">
+      <div className="seg" role="group" aria-label="Vista">
       <button className={view === 'plan' ? 'on' : ''} onClick={() => setView('plan')}>Unidades y actividades</button>
       <button className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>Calendario</button>
-      {onProgress && <button onClick={onProgress}>Seguimiento ›</button>}
+    </div>
+      {onProgress && <button className="linkish" onClick={onProgress}>Seguimiento ›</button>}
     </div>
   );
   if (view === 'cal') return <div>{tabs}<Calendar subject={subject} groups={groups} units={units} acts={actsRaw ?? []} /></div>;

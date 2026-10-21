@@ -197,7 +197,7 @@ function WorkImport(p: { subject: Subject; group: Group; existing: Activity[]; o
   );
 }
 
-export function Planner({ subject }: { subject: Subject }) {
+export function Planner({ subject, onProgress }: { subject: Subject; onProgress?: () => void }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const [gid, setGid] = useCurrentGroupId();
@@ -230,6 +230,7 @@ export function Planner({ subject }: { subject: Subject }) {
     <div className="row">
       <button className={view === 'plan' ? 'on' : ''} onClick={() => setView('plan')}>Unidades y actividades</button>
       <button className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>Calendario</button>
+      {onProgress && <button onClick={onProgress}>Seguimiento ›</button>}
     </div>
   );
   if (view === 'cal') return <div>{tabs}<Calendar subject={subject} groups={groups} units={units} acts={actsRaw ?? []} /></div>;

@@ -14,21 +14,22 @@ import { Settings } from './ui/Settings';
 import { SchoolCalendar } from './ui/SchoolCalendar';
 import { NewSubject } from './ui/NewSubject';
 import { Today } from './ui/Today';
+import { Progress } from './ui/Progress';
 import { Icon } from './ui/icons';
 import type { IconName } from './ui/icons';
 import { setCurrentGroup, useCurrentGroupId } from './ui/hooks';
 
-type View = 'hoy' | 'notes' | 'plan' | 'more' | 'att' | 'groups' | 'rep' | 'comm' | 'curr' | 'config' | 'cal' | 'conn' | 'new';
+type View = 'hoy' | 'notes' | 'plan' | 'seg' | 'more' | 'att' | 'groups' | 'rep' | 'comm' | 'curr' | 'config' | 'cal' | 'conn' | 'new';
 
 const MAIN: [View, string, IconName][] = [['hoy', 'Hoy', 'home'], ['notes', 'Cuaderno', 'grid'], ['plan', 'Planificar', 'cal']];
 const SECTIONS: { title: string; items: [View, string, string][] }[] = [
   { title: 'Alumnado', items: [['groups', 'Grupos y alumnos', 'Alumnado, NIA, importar de Classroom'], ['att', 'Asistencia', 'Pasar lista y resumen de faltas'], ['rep', 'Informes', 'Perfil competencial y boletines'], ['comm', 'Comunicación con el alumnado', 'Correos y avisos en el tablón de Classroom']] },
-  { title: 'Programación', items: [['curr', 'Currículo', 'Competencias, criterios, objetivos y versiones'], ['config', 'Evaluación y configuración', 'Instrumentos, evaluaciones y cálculo'], ['cal', 'Calendario escolar', 'Festivos, evaluaciones y sesiones previstas'], ['new', 'Nueva asignatura', 'Plantilla LOMLOE, FP o copia']] },
+  { title: 'Programación', items: [['seg', 'Seguimiento', 'Avance de las sesiones y resultados del grupo'], ['curr', 'Currículo', 'Competencias, criterios, objetivos y versiones'], ['config', 'Evaluación y configuración', 'Instrumentos, evaluaciones y cálculo'], ['cal', 'Calendario escolar', 'Festivos, evaluaciones y sesiones previstas'], ['new', 'Nueva asignatura', 'Plantilla LOMLOE, FP o copia']] },
   { title: 'Datos', items: [['conn', 'Conexión y copias', 'Sincronización, Classroom y copia de seguridad']] },
 ];
-const TITLE: Record<View, string> = { hoy: 'Hoy', notes: 'Cuaderno', plan: 'Planificar', more: 'Más', att: 'Asistencia', groups: 'Grupos y alumnos', rep: 'Informes', comm: 'Comunicación', curr: 'Currículo', config: 'Evaluación y configuración', cal: 'Calendario escolar', conn: 'Conexión y copias', new: 'Nueva asignatura' };
+const TITLE: Record<View, string> = { hoy: 'Hoy', notes: 'Cuaderno', plan: 'Planificar', seg: 'Seguimiento', more: 'Más', att: 'Asistencia', groups: 'Grupos y alumnos', rep: 'Informes', comm: 'Comunicación', curr: 'Currículo', config: 'Evaluación y configuración', cal: 'Calendario escolar', conn: 'Conexión y copias', new: 'Nueva asignatura' };
 /** Pantallas que trabajan sobre una asignatura y un grupo (llevan el selector arriba). */
-const WITH_CONTEXT = new Set<View>(['notes', 'plan', 'att', 'groups', 'rep', 'comm', 'curr', 'config']);
+const WITH_CONTEXT = new Set<View>(['notes', 'plan', 'seg', 'att', 'groups', 'rep', 'comm', 'curr', 'config']);
 
 function SyncBar() {
   const st = useSyncStatus();
@@ -66,7 +67,7 @@ export function App() {
   const subject = subjects?.find((s) => s.id === sid) ?? subjects?.[0];
   const go = (v: View) => { setView(v); setAttPreset(undefined); setFocusAct(undefined); window.scrollTo(0, 0); };
   const ctxValue = `${subject?.id ?? ''}|${groups.some((g) => g.id === gid && g.subjectId === subject?.id) ? gid : groups.find((g) => g.subjectId === subject?.id)?.id ?? ''}`;
-  const section = MAIN.some(([v]) => v === view) ? view : 'more';
+  const section = view === 'seg' ? 'plan' : MAIN.some(([v]) => v === view) ? view : 'more';
 
   const context = subjects && WITH_CONTEXT.has(view) && (
     <select className="ctx" aria-label="Grupo y asignatura" value={ctxValue} onChange={(e) => { const [s, g] = e.target.value.split('|'); setSid(s); if (g) setCurrentGroup(g); }}>
@@ -83,7 +84,7 @@ export function App() {
     <div className="shell">
       <nav className="side noprint" aria-label="Secciones">
         <b className="brand">Cuaderno docente</b>
-        {MAIN.map(([v, l, i]) => <button key={v} aria-current={view === v ? 'page' : undefined} onClick={() => go(v)}><Icon name={i} /> {l}</button>)}
+        {[...MAIN, ['seg', 'Seguimiento', 'chart'] as [View, string, IconName]].map(([v, l, i]) => <button key={v} aria-current={view === v ? 'page' : undefined} onClick={() => go(v)}><Icon name={i} /> {l}</button>)}
         {SECTIONS.map((s) => (
           <div key={s.title} className="sidegroup">
             <span>{s.title}</span>
@@ -124,12 +125,13 @@ export function App() {
         {view === 'new' && <NewSubject subjects={subjects ?? []} onDone={(id) => { if (id) { setSid(id); go('config'); } else go('more'); }} />}
         {view === 'conn' && <Settings />}
         {view === 'cal' && <SchoolCalendar />}
-        {subject && view === 'notes' && <Notebook key={subject.id + (focusAct ?? '')} subject={subject} focusAct={focusAct} />}
+        {subject && view === 'notes' && <Notebook key={subject.id + (focusAct ?? '')} subject={subject} focusAct={focusAct} onProgress={() => go('seg')} />}
         {subject && view === 'att' && <Attendance key={subject.id + JSON.stringify(attPreset ?? '')} subject={subject} preset={attPreset} />}
+        {subject && view === 'seg' && <Progress key={subject.id} subject={subject} />}
         {subject && view === 'comm' && <Comms key={subject.id} subject={subject} />}
         {subject && view === 'rep' && <Reports key={subject.id} subject={subject} />}
         {subject && view === 'groups' && <Groups key={subject.id} subject={subject} />}
-        {subject && view === 'plan' && <Planner key={subject.id} subject={subject} />}
+        {subject && view === 'plan' && <Planner key={subject.id} subject={subject} onProgress={() => go('seg')} />}
         {subject && view === 'curr' && <Curriculum key={subject.id} subject={subject} />}
         {subject && view === 'config' && <Config key={subject.id} subject={subject} />}
       </main>

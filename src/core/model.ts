@@ -90,7 +90,12 @@ export interface CLink extends Stamp {
 export const linkId = (subjectId: ID, relation: string, fromId: ID, toId: ID) =>
   `${subjectId}/${relation}:${fromId}>${toId}`;
 
-export interface Group extends Stamp { id: ID; subjectId: ID; name: string; schoolYear: string; classroomCourseId?: string }
+export interface Group extends Stamp {
+  id: ID; subjectId: ID; name: string; schoolYear: string; classroomCourseId?: string;
+  /** Horario semanal (1 = lunes) y festivos, para generar el calendario de sesiones. */
+  timetable?: { weekday: number; slot: string }[];
+  holidays?: string;
+}
 export interface Student extends Stamp {
   id: ID; groupId: ID; firstName: string; lastName: string; email?: string; nia?: string; classroomUserId?: string;
   /** Pérdida de evaluación continua (la decide el docente) y notas de la vía alternativa. */
@@ -156,6 +161,17 @@ export interface LearningUnit extends Stamp {
   termId: ID;
   plannedSessions: number;
   nodeIds: ID[];
+}
+
+/** Sesión de clase planificada (fecha + hora) con su unidad y tema. */
+export interface Session extends Stamp {
+  id: ID;
+  groupId: ID;
+  date: string; // AAAA-MM-DD
+  slot: string;
+  unitId?: ID;
+  topic: string;
+  notes?: string;
 }
 
 export type AttStatus = 'P' | 'A' | 'R' | 'J';

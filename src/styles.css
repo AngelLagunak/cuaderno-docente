@@ -70,3 +70,15 @@ td.mxon { background:var(--chip); }
 .mapcard b { color:var(--brand); }
 .mapcard.dim { opacity:.25; }
 .mapcard.hit { border-color:var(--brand); box-shadow:0 0 0 2px var(--brand); }
+.week { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:6px; }
+@media (max-width: 760px) { .week { grid-template-columns:1fr; } }
+.day { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:6px; min-height:70px; }
+.day.today { border-color:var(--brand); }
+.session { border-top:1px solid var(--line); padding:4px 0; display:grid; grid-template-columns:minmax(0, 1fr); gap:4px; }
+.session > *, .session input, .session button { min-width:0; }
+.session .small { padding:2px 6px; }
+.session select, .session input { padding:4px 6px; font-size:.85rem; width:100%; }
+.session .sp { align-items:center; gap:4px; }
+.session .sp b { white-space:nowrap; font-size:.8rem; }
+.session .sp select { width:auto; flex:1; min-width:0; }
+.day { min-width:0; }

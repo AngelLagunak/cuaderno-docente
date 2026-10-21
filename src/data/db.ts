@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { linkId } from '../core/model';
-import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, Stamp, Student, Subject } from '../core/model';
+import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, Session, Stamp, Student, Subject } from '../core/model';
 import { catalogs } from '../catalogs';
 import { migrateSubject } from '../core/curriculum';
 
@@ -17,6 +17,7 @@ class DB extends Dexie {
   messages!: Table<Message, string>;
   templates!: Table<Template, string>;
   rubrics!: Table<Rubric, string>;
+  sessions!: Table<Session, string>;
 
   constructor() {
     super('cuaderno-docente');
@@ -34,6 +35,8 @@ class DB extends Dexie {
     this.version(4).stores({ messages: 'id, groupId, sentAt', templates: 'id' });
     // v5: rúbricas propias. Las notas por criterio van en `grades` con `nodeId`; las existentes no cambian.
     this.version(5).stores({ rubrics: 'id, subjectId' });
+    // v6: calendario de sesiones.
+    this.version(6).stores({ sessions: 'id, groupId, date' });
   }
 }
 

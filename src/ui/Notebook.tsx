@@ -4,6 +4,9 @@ import { SigadExport } from './SigadExport';
 import { ObsPanel } from './ObsPanel';
 import { Cell, RecMark, fmt, parse, raw } from './cells';
 import { FinalView } from './FinalView';
+import { StudentGrader } from './StudentGrader';
+import { Menu } from './Menu';
+import { Icon } from './icons';
 import { canImprove, outcome, scaleLabel } from '../core/rules';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, lastUndo, saveGrade, saveItemGrade, subscribeUndo, undo, undoable } from '../data/db';
@@ -73,6 +76,8 @@ export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: s
   const [busy, setBusy] = useState(false);
   const [imp, setImp] = useState(false);
   const [sigad, setSigad] = useState(false);
+  const [mode, setMode] = useState<'one' | 'list'>('one');
+  const [stuIdx, setStuIdx] = useState(0);
   const undoLabel = useSyncExternalStore(subscribeUndo, lastUndo);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
@@ -222,18 +227,34 @@ export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: s
     });
   }
 
+  const termKey = view === 'final' ? 'final' : term?.id;
+  const termVals = students.map((s) => termResult(subject, acts, sgOf(s), term.id, curr).value);
+  const withVal = termVals.filter((v): v is number => v != null);
+  const missing = students.reduce((n, s) => n + termActs.filter((a) => activityBase(a, sgOf(s)) == null).length, 0);
+  const openAct = (a: Activity, s?: Student) => { setActId(a.id); setView('act'); setMode('one'); if (s) setStuIdx(students.findIndex((x) => x.id === s.id)); window.scrollTo(0, 0); };
+  const menu: [string, () => void, boolean?][] = [
+    ...(group.classroomCourseId && linked > 0 ? [['Traer notas de Classroom', () => pullAll(), busy] as [string, () => void, boolean]] : []),
+    ['Importar notas (CSV o Excel)', () => setImp(!imp)],
+    ['Exportar Excel', exportXlsx],
+    ['Exportar CSV', exportCsv],
+    ['Notas para SIGAD', () => setSigad(!sigad)],
+  ];
+  const stu = students[Math.min(stuIdx, students.length - 1)];
+
   return (
     <div>
-      <div className="row">
-        <button className={view === 'table' ? 'on' : ''} onClick={() => setView('table')}>Tabla</button>
-        <button className={view === 'act' ? 'on' : ''} onClick={() => setView('act')}>Por actividad</button>
-        <button className={view === 'final' ? 'on' : ''} onClick={() => setView('final')}>Final</button>
-        <button className="small" onClick={exportCsv}>Exportar CSV</button>
-        <button className="small" onClick={exportXlsx}>Exportar Excel</button>
-        <button className="small" onClick={() => setImp(!imp)}>Importar notas</button>
-        <button className="small" onClick={() => setSigad(!sigad)}>SIGAD</button>
-        {undoLabel && <button className="small" onClick={async () => setMsg(`Deshecho: ${await undo()}.`)} title="Deshace el último cambio de notas de esta sesión">↶ Deshacer {undoLabel}</button>}
-        {group.classroomCourseId && linked > 0 && <button className="small" disabled={busy} onClick={() => pullAll()} title="Traer notas y rúbricas de todas las tareas vinculadas">Classroom ⟳</button>}
+      <div className="row toolbar">
+        {view === 'act' ? (
+          <button className="small" onClick={() => setView('table')}><Icon name="left" size={16} /> Tabla</button>
+        ) : (
+          <div className="seg" role="group" aria-label="Evaluación">
+            {subject.terms.map((t) => <button key={t.id} aria-pressed={termKey === t.id} className={termKey === t.id ? 'on' : ''} onClick={() => { setTermId(t.id); setView('table'); }}>{t.name.replace(' evaluación', '')}</button>)}
+            <button aria-pressed={termKey === 'final'} className={termKey === 'final' ? 'on' : ''} onClick={() => setView('final')}>Final</button>
+          </div>
+        )}
+        <span className="grow" />
+        {undoLabel && <button className="small" onClick={async () => setMsg(`Deshecho: ${await undo()}.`)} title="Deshace el último cambio de notas de esta sesión">↶ Deshacer</button>}
+        <Menu items={menu} />
       </div>
 
       {msg && <p className="mute">{msg}</p>}
@@ -242,17 +263,45 @@ export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: s
       {students.length === 0 && <p className="mute">Este grupo no tiene alumnos.</p>}
       {students.length > 0 && acts.length === 0 && <p className="mute">Crea actividades en el Planificador.</p>}
 
-      {students.length > 0 && acts.length > 0 && view !== 'final' && (
+      {students.length > 0 && acts.length > 0 && view === 'table' && (
+        <div className="stats mute">
+          <span>Media del grupo <b>{fmt(round(withVal.length ? withVal.reduce((x, y) => x + y, 0) / withVal.length : null, 1), 1)}</b></span>
+          <span>Por debajo de {raw(cfg.passMark)} <b className={withVal.some((v) => v < cfg.passMark) ? 'warn' : ''}>{withVal.filter((v) => v < cfg.passMark).length}</b></span>
+          <span>Notas sin poner <b>{missing}</b></span>
+        </div>
+      )}
+
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && (
         <div className="row">
-          {view === 'table' ? (
-            <select value={term.id} onChange={(e) => setTermId(e.target.value)}>
-              {subject.terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          ) : (
-            <select value={act?.id} onChange={(e) => setActId(e.target.value)}>
-              {acts.map((a) => <option key={a.id} value={a.id}>{a.title} · {subject.terms.find((t) => t.id === a.termId)?.name}</option>)}
-            </select>
-          )}
+          <select aria-label="Actividad" value={act.id} onChange={(e) => setActId(e.target.value)}>
+            {acts.map((a) => <option key={a.id} value={a.id}>{a.title} · {subject.terms.find((t) => t.id === a.termId)?.name}</option>)}
+          </select>
+          <div className="seg" role="group" aria-label="Modo">
+            <button aria-pressed={mode === 'one'} className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>Un alumno</button>
+            <button aria-pressed={mode === 'list'} className={mode === 'list' ? 'on' : ''} onClick={() => setMode('list')}>Lista</button>
+          </div>
+        </div>
+      )}
+
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'one' && stu && (
+        <div className="gradeLayout">
+          <div className="tw sideTable">
+            <table className="t">
+              <thead><tr><th>Alumno</th><th>{act.title}</th><th className="sum">{subject.terms.find((t) => t.id === act.termId)?.name.replace(' evaluación', '')}</th></tr></thead>
+              <tbody>
+                {students.map((s, i) => (
+                  <tr key={s.id} className={i === stuIdx ? 'sel' : ''}>
+                    <td><button className="linkish" onClick={() => setStuIdx(i)}>{s.lastName}, {s.firstName}</button></td>
+                    <td>{fmt(activityBase(act, sgOf(s)), 2)}</td>
+                    <td className="sum">{fmt(round(termResult(subject, acts, sgOf(s), act.termId, curr).value, cfg.termDecimals), cfg.termDecimals)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <StudentGrader subject={subject} act={act} acts={acts} student={stu} sg={sgOf(stu)} items={actItems(act)} rubric={rubricOf(act)} curr={curr}
+            pos={`${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · ${actItems(act).filter((n) => sgOf(stu).byItem.get(act.id)?.get(n.id)?.value != null).length} de ${actItems(act).length} criterios`}
+            onPrev={() => setStuIdx((stuIdx - 1 + students.length) % students.length)} onNext={() => setStuIdx((stuIdx + 1) % students.length)} />
         </div>
       )}
 
@@ -262,7 +311,7 @@ export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: s
             <thead>
               <tr>
                 <th>Alumno</th>
-                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}>{a.title}<div className="mute">{instName(a.instrumentId).slice(0, 10)}</div>{gl && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
+                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}><button className="linkish" title="Calificar esta actividad" onClick={() => openAct(a)}>{a.title}</button><div className="mute">{instName(a.instrumentId).slice(0, 10)}</div>{gl && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
                 {partsHead.map((p) => <th key={p.id} className="sum" title={p.title}>{p.name}</th>)}
                 <th className="sum">{term.name}</th>
               </tr>
@@ -292,7 +341,7 @@ export function Notebook({ subject, focusAct }: { subject: Subject; focusAct?: s
       )}
       {view === 'table' && students.length > 0 && <p className="mute">* Provisional: faltan {partLabel} por evaluar.{gl ? ` La nota de la evaluación es la media de las ${partLabel} evaluadas.` : ''} Lo no evaluado no cuenta como 0. Se guarda al salir de la casilla o con Intro. Las notas sombreadas son la media de los criterios (se editan en «Por actividad»).</p>}
 
-      {students.length > 0 && acts.length > 0 && view === 'act' && act && (
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'list' && (
         <div className="card">
           <b>{act.title}</b>
           <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}{rubricOf(act) ? ` · rúbrica «${rubricOf(act)!.name}»` : ''}</div>

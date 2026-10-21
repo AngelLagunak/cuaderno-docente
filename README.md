@@ -149,3 +149,9 @@ En **Currículo**:
 - **Grupo de trabajo** único: se elige arriba («1.º BA · Proyectos Artísticos») y vale para todas las pantallas; se recuerda en el dispositivo.
 - **Hoy**: las clases del día de todos los grupos (sesiones planificadas o el horario), con ‹ › para ir a otros días. Cada clase muestra unidad y tema, lo pendiente de la sesión anterior, la asistencia y, según toque, «Pasar lista» (abre la lista de esa hora con tarjetas), «Ver o corregir la lista» o «Anotar realizado y pendiente». Debajo, **Por corregir** (actividades con fecha pasada y alumnos sin nota; abre la actividad en el Cuaderno) y **Avisos** (faltas, copia de seguridad, calendario escolar).
 - **Aspecto**: tipografía Inter (también sin conexión), colores y tamaños nuevos, botones más grandes, modo oscuro.
+
+## Cuaderno con panel de calificar (Fase 21)
+- Arriba, **1.ª · 2.ª · 3.ª · Final** para cambiar de evaluación o ver la nota final; debajo, media del grupo, cuántos están por debajo del aprobado y cuántas notas faltan.
+- Las acciones menos frecuentes (traer de Classroom, importar, exportar Excel o CSV, SIGAD) van en el menú **⋯**; «↶ Deshacer» aparece cuando hay algo que deshacer.
+- **Calificar**: tocando el título de una actividad en la tabla (o desde «Por corregir» en Hoy) se abre **un alumno cada vez**: un toque por criterio con los niveles de la rúbrica (o la nota numérica), el comentario y «Siguiente alumno». Debajo, **Se calcula solo**: las competencias específicas (o instrumentos) y la nota de la evaluación del alumno al momento, resaltando lo que mueve esa actividad.
+- En el ordenador, la tabla del grupo queda a la izquierda y el panel a la derecha. «Lista» mantiene la vista de todos a la vez (recuperaciones, entregas vacías, Classroom, observaciones).

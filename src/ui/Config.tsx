@@ -85,7 +85,13 @@ export function Config({ subject }: { subject: Subject }) {
         <label>Decimales en evaluaciones <input className="num" type="number" min={0} max={3} value={d.config.termDecimals} onChange={(e) => cfg({ termDecimals: num(e.target.value) })} /></label>
         <label>Decimales en la nota final <input className="num" type="number" min={0} max={3} value={d.config.finalDecimals} onChange={(e) => cfg({ finalDecimals: num(e.target.value) })} /></label>
         <label>Nota final mínima (SIGAD no admite 0) <input className="num" type="number" min={0} max={10} value={d.config.minGrade ?? 1} onChange={(e) => cfg({ minGrade: num(e.target.value, 1) })} /></label>
-        <label><input type="checkbox" style={{ width: 'auto' }} checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Cada instrumento debe llegar al aprobado</label>
+        <label>Nota de cada evaluación
+          <select value={d.config.gradeLevel ?? ''} onChange={(e) => cfg({ gradeLevel: e.target.value || null })}>
+            <option value="">Media ponderada de instrumentos</option>
+            {d.levels.map((l) => <option key={l.key} value={l.key}>Media de {l.plural.toLowerCase()} (los instrumentos ponderan las medidas de cada criterio)</option>)}
+          </select>
+        </label>
+        <label><input type="checkbox" style={{ width: 'auto' }} checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Avisar si alguna parte ({d.config.gradeLevel ? d.levels.find((l) => l.key === d.config.gradeLevel)?.plural.toLowerCase() : 'instrumentos'}) no llega al aprobado</label>
         <label>Penalización por entrega tardía (%) <input className="num" type="number" min={0} max={100} value={d.config.latePenaltyPct} onChange={(e) => cfg({ latePenaltyPct: num(e.target.value) })} /></label>
         <label>Aviso de faltas injustificadas (%) <input className="num" type="number" min={0} max={100} value={d.config.absenceWarnPct ?? 20} onChange={(e) => cfg({ absenceWarnPct: num(e.target.value, 20) })} /></label>
         <label>Sesiones anuales previstas (0 = las pasadas lista) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>

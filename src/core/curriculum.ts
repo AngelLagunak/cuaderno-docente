@@ -28,11 +28,17 @@ export function review(subject: Subject, nodes: CNode[], links: CLink[]): Issue[
 }
 
 /**
- * Cambios de nombre en materias ya guardadas. «Indicador» pasa a «Concreción» (así lo llama la programación),
- * para no confundirlo con los indicadores de logro. Devuelve la materia cambiada o null si no hay nada que hacer.
+ * Cambios en materias ya guardadas. Devuelve la materia cambiada o null si no hay nada que hacer.
+ * - «Indicador» pasa a «Concreción» (así lo llama la programación), para no confundirlo con los indicadores de logro.
+ * - Proyectos Artísticos calcula la nota por competencias específicas (si no se ha elegido otra cosa).
  */
 export function migrateSubject(s: Subject): Subject | null {
   let changed = false;
+  let config = s.config;
+  if (s.id === 'pa-1bach' && config.gradeLevel === undefined && s.levels.some((l) => l.key === 'ce')) {
+    config = { ...config, gradeLevel: 'ce' };
+    changed = true;
+  }
   const levels = s.levels.map((l) => {
     if (l.key === 'ind' && l.label === 'Indicador' && l.plural === 'Indicadores') {
       changed = true;
@@ -40,7 +46,7 @@ export function migrateSubject(s: Subject): Subject | null {
     }
     return l;
   });
-  return changed ? { ...s, levels } : null;
+  return changed ? { ...s, levels, config } : null;
 }
 
 /** Niveles que se califican (criterio, concreción, aspecto…). */

@@ -39,10 +39,13 @@ export function Reports({ subject }: { subject: Subject }) {
   const gradesOf = (s: Student) => idx.get(s.id) ?? noGrades();
 
   const cfg = subject.config;
+  const gl = cfg.gradeLevel;
+  const glLabel = subject.levels.find((l) => l.key === gl)?.label ?? '';
+  const glPlural = subject.levels.find((l) => l.key === gl)?.plural ?? '';
   const tid = periodId || undefined;
   const rows = students.map((s) => {
     const m = gradesOf(s);
-    return { s, m, fin: finalResult(subject, acts, m), prof: profile(subject, nodes, links, acts, m, tid) };
+    return { s, m, fin: finalResult(subject, acts, m, { nodes, links }), prof: profile(subject, nodes, links, acts, m, tid) };
   });
 
   const axisOpts = [
@@ -151,12 +154,15 @@ export function Reports({ subject }: { subject: Subject }) {
               <p className="mute">{subject.name} · {group.name} · {group.schoolYear}</p>
               <div className="tw">
                 <table className="t">
-                  <thead><tr><th>Instrumento</th>{subject.terms.map((t) => <th key={t.id}>{t.name}</th>)}</tr></thead>
+                  <thead><tr><th>{gl ? glLabel : 'Instrumento'}</th>{subject.terms.map((t) => <th key={t.id}>{t.name}</th>)}</tr></thead>
                   <tbody>
-                    {subject.instruments.map((i) => (
-                      <tr key={i.id}>
-                        <td>{i.name} ({i.weight})</td>
-                        {sr.fin.terms.map((t) => <td key={t.id}>{fmt(round(t.result.byInstrument.find((x) => x.id === i.id)?.value ?? null, cfg.termDecimals), cfg.termDecimals)}</td>)}
+                    {(sr.fin.terms[0]?.result.parts ?? []).map((p, k) => (
+                      <tr key={p.id}>
+                        <td title={gl ? nodes.find((n) => n.id === p.id)?.title : undefined}>{gl ? p.name : `${p.name} (${p.weight})`}</td>
+                        {sr.fin.terms.map((t) => {
+                          const v = t.result.parts[k]?.value ?? null;
+                          return <td key={t.id} className={cfg.minPerInstrument && v != null && v < cfg.passMark ? 'warn' : ''}>{fmt(round(v, cfg.termDecimals), cfg.termDecimals)}</td>;
+                        })}
                       </tr>
                     ))}
                     <tr className="sum">
@@ -167,7 +173,8 @@ export function Reports({ subject }: { subject: Subject }) {
                 </table>
               </div>
               <p><b>Nota final: {fmt(sr.fin.rounded, cfg.finalDecimals)}</b> {sr.fin.coverage < 1 && sr.fin.value != null && <span className="mute">(provisional)</span>}
-                {sr.fin.belowMin && <span className="warn"> · algún instrumento bajo el mínimo</span>}</p>
+                {sr.fin.belowMin && <span className="warn"> · {gl ? `alguna ${glLabel.toLowerCase()} por debajo de ${cfg.passMark}` : 'algún instrumento bajo el mínimo'}</span>}</p>
+              {gl && <p className="mute">Cada evaluación es la media de las {glPlural.toLowerCase()} evaluadas; cada criterio combina sus medidas con el peso de cada instrumento ({subject.instruments.map((i) => `${i.name} ${i.weight}`).join(', ')}).</p>}
             </div>
 
             <div className="card">

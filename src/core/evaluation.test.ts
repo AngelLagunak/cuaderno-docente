@@ -6,6 +6,10 @@ import { pa } from '../catalogs/pa';
 import { mm } from '../catalogs/mm';
 
 const PA = pa.subject;
+/** Proyectos Artísticos con la nota por instrumentos (modo antiguo) para probar ese cálculo. */
+const PAI: Subject = { ...PA, config: { ...PA.config, gradeLevel: null } };
+const C = { nodes: pa.nodes, links: pa.links };
+const CM = { nodes: mm.nodes, links: [] };
 const crit = (c: string) => `pa-1bach/crit:${c}`;
 const ind = (c: string) => `pa-1bach/ind:${c}`;
 const ce = (n: number) => `pa-1bach/ce:CE.PA.${n}`;
@@ -53,7 +57,7 @@ describe('termResult (PA 45/25/15/15)', () => {
     const p1 = act({ instrumentId: 'proy', weight: 2 });
     const p2 = act({ instrumentId: 'proy', weight: 1 });
     const c1 = act({ instrumentId: 'cuad' });
-    const r = termResult(PA, [p1, p2, c1], grades([[p1, 9], [p2, 6], [c1, 5]]), 't1');
+    const r = termResult(PAI, [p1, p2, c1], grades([[p1, 9], [p2, 6], [c1, 5]]), 't1', C);
     expect(r.byInstrument.find((i) => i.id === 'proy')!.value).toBe(8);
     expect(r.value).toBeCloseTo((8 * 45 + 5 * 25) / 70);
     expect(r.coverage).toBeCloseTo(70 / 100);
@@ -61,14 +65,14 @@ describe('termResult (PA 45/25/15/15)', () => {
   it('marca instrumentos bajo el aprobado con minPerInstrument', () => {
     const p = act({ instrumentId: 'proy' });
     const e = act({ instrumentId: 'exam' });
-    const r = termResult(PA, [p, e], grades([[p, 9], [e, 3]]), 't1');
+    const r = termResult(PAI, [p, e], grades([[p, 9], [e, 3]]), 't1', C);
     expect(r.belowMin).toEqual(['Exámenes teórico-prácticos']);
-    expect(termResult(withCfg(PA, { minPerInstrument: false }), [p, e], grades([[p, 9], [e, 3]]), 't1').belowMin).toEqual([]);
+    expect(termResult(withCfg(PAI, { minPerInstrument: false }), [p, e], grades([[p, 9], [e, 3]]), 't1', C).belowMin).toEqual([]);
   });
   it('solo usa las actividades del trimestre pedido', () => {
     const a1 = act({ termId: 't1' });
     const a2 = act({ termId: 't2' });
-    expect(termResult(PA, [a1, a2], grades([[a1, 4], [a2, 10]]), 't1').value).toBe(4);
+    expect(termResult(PAI, [a1, a2], grades([[a1, 4], [a2, 10]]), 't1', C).value).toBe(4);
   });
 });
 
@@ -77,25 +81,25 @@ describe('finalResult (30/30/40)', () => {
   const t2 = act({ termId: 't2' });
   const t3 = act({ termId: 't3' });
   it('pondera trimestres y redondea a entero', () => {
-    const f = finalResult(PA, [t1, t2, t3], grades([[t1, 5], [t2, 6], [t3, 8]]));
+    const f = finalResult(PAI, [t1, t2, t3], grades([[t1, 5], [t2, 6], [t3, 8]]), C);
     expect(f.value).toBeCloseTo(6.5);
     expect(f.rounded).toBe(7);
     expect(f.coverage).toBe(1);
   });
   it('ignora el trimestre vacío y marca la cobertura', () => {
-    const f = finalResult(PA, [t1, t2, t3], grades([[t1, 5], [t2, 7]]));
+    const f = finalResult(PAI, [t1, t2, t3], grades([[t1, 5], [t2, 7]]), C);
     expect(f.value).toBe(6);
     expect(f.coverage).toBeCloseTo(0.6);
   });
   it('la nota final redondeada nunca baja de 1 (SIGAD)', () => {
-    const f = finalResult(PA, [t1], grades([[t1, 0.3]]));
+    const f = finalResult(PAI, [t1], grades([[t1, 0.3]]), C);
     expect(f.value).toBeCloseTo(0.3);
     expect(f.rounded).toBe(1);
-    expect(finalResult(withCfg(PA, { minGrade: 0 }), [t1], grades([[t1, 0.3]])).rounded).toBe(0);
-    expect(finalResult(mm.subject, [{ ...t1, subjectId: mm.subject.id, instrumentId: 'prac' }], grades([[t1, 0]])).rounded).toBe(1);
+    expect(finalResult(withCfg(PAI, { minGrade: 0 }), [t1], grades([[t1, 0.3]]), C).rounded).toBe(0);
+    expect(finalResult(mm.subject, [{ ...t1, subjectId: mm.subject.id, instrumentId: 'prac' }], grades([[t1, 0]]), CM).rounded).toBe(1);
   });
   it('sin notas no hay nota final', () => {
-    expect(finalResult(PA, [t1], grades([])).rounded).toBeNull();
+    expect(finalResult(PAI, [t1], grades([]), C).rounded).toBeNull();
   });
 });
 
@@ -151,14 +155,15 @@ describe('profile (PA)', () => {
     expect(prof([p, e], grades([[p, 9], [e, 3]])).nodes.get(crit('3.2'))).toBe(7.5);
   });
 
-  it('reparte el peso del instrumento entre sus actividades calificadas', () => {
+  it('dentro de un criterio, cada instrumento que lo mide pesa según su porcentaje', () => {
     const p1 = act({ instrumentId: 'proy', weight: 3, nodeIds: [crit('3.2')] });
-    const p2 = act({ instrumentId: 'proy', weight: 1, nodeIds: [crit('4.2')] });
-    const p3 = act({ instrumentId: 'proy', weight: 5 }); // sin calificar: no cuenta
+    const p2 = act({ instrumentId: 'proy', weight: 1, nodeIds: [crit('3.2')] });
+    const p3 = act({ instrumentId: 'proy', weight: 5, nodeIds: [crit('4.2')] }); // otro criterio: no influye en 3.2
+    const p4 = act({ instrumentId: 'proy', weight: 5, nodeIds: [crit('3.2')] }); // sin calificar: no cuenta
     const e = act({ instrumentId: 'exam', nodeIds: [crit('3.2')] });
-    // p1 = 45·3/4 = 33,75; e = 15 → (8·33,75 + 2·15) / 48,75
-    const r = prof([p1, p2, p3, e], grades([[p1, 8], [p2, 4], [e, 2]])).nodes.get(crit('3.2'));
-    expect(r).toBeCloseTo((8 * 33.75 + 2 * 15) / 48.75);
+    // Proyectos en 3.2 = (8·3 + 4·1) / 4 = 7; examen = 2 → (7·45 + 2·15) / 60 = 5,75
+    const r = prof([p1, p2, p3, p4, e], grades([[p1, 8], [p2, 4], [p3, 10], [e, 2]])).nodes.get(crit('3.2'));
+    expect(r).toBeCloseTo(5.75);
   });
 
   it('pondera trimestres en el perfil acumulado y filtra por trimestre', () => {
@@ -215,7 +220,7 @@ describe('notas por criterio', () => {
   it('la nota oficial usa la media de criterios', () => {
     const p = act({ instrumentId: 'proy', nodeIds: [crit('3.2'), crit('4.2')] });
     const e = act({ instrumentId: 'exam' });
-    const r = termResult(PA, [p, e], grades([[e, 4]], [[p, crit('3.2'), 10], [p, crit('4.2'), 6]]), 't1');
+    const r = termResult(PAI, [p, e], grades([[e, 4]], [[p, crit('3.2'), 10], [p, crit('4.2'), 6]]), 't1', C);
     expect(r.byInstrument.find((i) => i.id === 'proy')!.value).toBe(8);
     expect(r.value).toBeCloseTo((8 * 45 + 4 * 15) / 60);
   });
@@ -232,5 +237,64 @@ describe('notas por criterio', () => {
     const a = act({ nodeIds: [crit('1.1'), ind('1.1.1'), ind('1.1.2')] });
     const pr = profile(PA, pa.nodes, pa.links, [a], grades([], [[a, crit('1.1'), 2], [a, ind('1.1.1'), 6], [a, ind('1.1.2'), 8]]));
     expect(pr.nodes.get(crit('1.1'))).toBe(7);
+  });
+});
+
+describe('nota por competencias específicas (Proyectos Artísticos, normativa LOMLOE Aragón)', () => {
+  it('la materia viene configurada para calcular por competencias específicas', () => {
+    expect(PA.config.gradeLevel).toBe('ce');
+    expect(mm.subject.config.gradeLevel).toBeNull();
+  });
+
+  it('cada evaluación es la media de las CE evaluadas; cada CE, la media de sus criterios', () => {
+    // CE.PA.1: 1.1 (vía concreciones 1.1.1 = 6 y 1.1.2 = 8 → 7) y 1.2 (5) → 6. CE.PA.3: 3.2 = 9 → 9.
+    const a = act({ nodeIds: [ind('1.1.1'), ind('1.1.2'), crit('1.2'), crit('3.2')] });
+    const sg = grades([], [[a, ind('1.1.1'), 6], [a, ind('1.1.2'), 8], [a, crit('1.2'), 5], [a, crit('3.2'), 9]]);
+    const r = termResult(PA, [a], sg, 't1', C);
+    expect(r.parts.map((p) => p.name)).toEqual(['CE.PA.1', 'CE.PA.2', 'CE.PA.3', 'CE.PA.4', 'CE.PA.5']);
+    expect(r.parts.map((p) => p.value)).toEqual([6, null, 9, null, null]);
+    expect(r.value).toBe(7.5); // (6 + 9) / 2: lo no evaluado no cuenta
+    expect(r.coverage).toBeCloseTo(2 / 5);
+    expect(r.belowMin).toEqual([]);
+  });
+
+  it('CE.PA.3 con 4 criterios pesa lo mismo que CE.PA.2 con 2', () => {
+    const a = act({ nodeIds: [crit('2.1'), crit('2.2'), crit('3.1'), crit('3.2'), crit('3.3'), crit('3.4')] });
+    const sg = grades([], [[a, crit('2.1'), 4], [a, crit('2.2'), 6], [a, crit('3.1'), 10], [a, crit('3.2'), 10], [a, crit('3.3'), 10], [a, crit('3.4'), 10]]);
+    // CE.PA.2 = 5, CE.PA.3 = 10 → 7,5 (con media de los 6 criterios saldría 8,33)
+    expect(termResult(PA, [a], sg, 't1', C).value).toBe(7.5);
+  });
+
+  it('los instrumentos ponderan las medidas de cada criterio (45/25/15/15)', () => {
+    const p = act({ instrumentId: 'proy', nodeIds: [crit('3.2')] });
+    const c = act({ instrumentId: 'cuad', nodeIds: [crit('3.2')] });
+    const e = act({ instrumentId: 'exam', nodeIds: [crit('4.2')] });
+    // 3.2 = (8·45 + 4·25) / 70 = 6,571…; 4.2 = 7 (solo examen) → CE.PA.3 = 6,571…, CE.PA.4 = 7
+    const r = termResult(PA, [p, c, e], grades([[p, 8], [c, 4], [e, 7]]), 't1', C);
+    expect(r.parts[2].value).toBeCloseTo(460 / 70);
+    expect(r.parts[3].value).toBe(7);
+    expect(r.value).toBeCloseTo((460 / 70 + 7) / 2);
+  });
+
+  it('avisa de las CE por debajo de 5', () => {
+    const a = act({ nodeIds: [crit('1.2'), crit('3.2')] });
+    const r = termResult(PA, [a], grades([], [[a, crit('1.2'), 3], [a, crit('3.2'), 9]]), 't1', C);
+    expect(r.belowMin).toEqual(['CE.PA.1']);
+  });
+
+  it('final ordinaria: 30/30/40 de las evaluaciones, entera y mínimo 1', () => {
+    const a1 = act({ termId: 't1', nodeIds: [crit('3.2')] });
+    const a2 = act({ termId: 't2', nodeIds: [crit('3.2')] });
+    const a3 = act({ termId: 't3', nodeIds: [crit('4.2')] });
+    const f = finalResult(PA, [a1, a2, a3], grades([[a1, 5], [a2, 6], [a3, 8]]), C);
+    expect(f.terms.map((t) => t.result.value)).toEqual([5, 6, 8]);
+    expect(f.value).toBeCloseTo(6.5);
+    expect(f.rounded).toBe(7);
+  });
+
+  it('una actividad sin criterios no cuenta en la nota por competencias', () => {
+    const a = act({ nodeIds: [crit('3.2')] });
+    const b = act({ instrumentId: 'exam', nodeIds: [] });
+    expect(termResult(PA, [a, b], grades([[a, 8], [b, 2]]), 't1', C).value).toBe(8);
   });
 });

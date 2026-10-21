@@ -34,6 +34,12 @@ describe('migrateSubject', () => {
     const m = migrateSubject(old)!;
     expect(m.levels.find((l) => l.key === 'ind')).toMatchObject({ label: 'Concreción', plural: 'Concreciones', graded: true });
   });
+  it('pasa Proyectos Artísticos a nota por competencias específicas si no se había elegido', () => {
+    const old = { ...pa.subject, config: { ...pa.subject.config, gradeLevel: undefined } };
+    expect(migrateSubject(old)!.config.gradeLevel).toBe('ce');
+    const chosen = { ...pa.subject, config: { ...pa.subject.config, gradeLevel: null } };
+    expect(migrateSubject(chosen)).toBeNull(); // el docente eligió instrumentos: se respeta
+  });
   it('no toca materias ya renombradas o con nombres propios', () => {
     expect(migrateSubject(pa.subject)).toBeNull();
     const custom = { ...pa.subject, levels: pa.subject.levels.map((l) => (l.key === 'ind' ? { ...l, label: 'Subcriterio' } : l)) };

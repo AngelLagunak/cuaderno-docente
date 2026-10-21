@@ -53,7 +53,7 @@ export function Comms({ subject }: { subject: Subject }) {
 
   const vars = (s: Student): Record<string, string> => {
     const sg = indexGrades((grRaw ?? []).filter((x) => x.studentId === s.id)).get(s.id) ?? noGrades();
-    const f = finalResult(subject, acts, sg);
+    const f = finalResult(subject, acts, sg, { nodes, links: lkRaw ?? [] });
     const prof = profile(subject, nodes, lkRaw ?? [], acts, sg);
     const faltas = (attRaw ?? []).filter((r) => !r.deleted && r.studentId === s.id && r.status === 'A').length;
     return {

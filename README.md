@@ -50,3 +50,8 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - Archivo `cuaderno-docente-db.json` en tu Drive. Fusión por registro (gana el `updatedAt` más reciente). Estado visible arriba.
 - Actualiza `Code.gs` y `appsscript.json` (nuevos permisos: Drive y disparadores), ejecuta `autorizar` y `instalarCopiaDiaria`, y crea nueva versión de la implementación.
 - Copias diarias en la carpeta «Cuaderno docente copias» (últimas 30). Exportar/importar JSON desde Conexión.
+
+## Tests del motor (Paso 1)
+- `src/core/*.test.ts` (vitest) prueban el cálculo con datos reales de los catálogos. Se ejecutan en GitHub Actions en cada subida; si fallan, no se publica.
+- Perfil competencial: cada actividad pesa lo mismo que en la nota final (trimestre × instrumento × peso dentro del instrumento). Si una actividad evalúa un criterio y uno de sus indicadores, la nota cuenta una sola vez.
+- Nota final mínima 1 tras redondear (SIGAD no admite 0). Ajustable en Configuración.

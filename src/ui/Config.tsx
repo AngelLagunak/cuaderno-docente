@@ -94,6 +94,18 @@ export function Config({ subject }: { subject: Subject }) {
         <label><input type="checkbox" style={{ width: 'auto' }} checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Avisar si alguna parte ({d.config.gradeLevel ? d.levels.find((l) => l.key === d.config.gradeLevel)?.plural.toLowerCase() : 'instrumentos'}) no llega al aprobado</label>
         <label>Penalización por entrega tardía (%) <input className="num" type="number" min={0} max={100} value={d.config.latePenaltyPct} onChange={(e) => cfg({ latePenaltyPct: num(e.target.value) })} /></label>
         <label>Aviso de faltas injustificadas (%) <input className="num" type="number" min={0} max={100} value={d.config.absenceWarnPct ?? 20} onChange={(e) => cfg({ absenceWarnPct: num(e.target.value, 20) })} /></label>
+        <label>Escala de la nota final
+          <select value={d.config.scale ?? 'num'} onChange={(e) => cfg({ scale: e.target.value as 'num' | 'ssapntsb' })}>
+            <option value="num">Numérica</option>
+            <option value="ssapntsb">Numérica + SS / AP / NT / SB</option>
+          </select>
+        </label>
+        <label><input type="checkbox" style={{ width: 'auto' }} checked={!!d.config.lateNoImprove} onChange={(e) => cfg({ lateNoImprove: e.target.checked })} /> Una entrega fuera de plazo sin justificar no se puede recuperar</label>
+        <label>Pérdida de evaluación continua: carpeta % <input className="num" type="number" min={0} max={100} value={d.config.lec?.folderPct ?? 50} onChange={(e) => cfg({ lec: { folderPct: num(e.target.value), examPct: d.config.lec?.examPct ?? 50 } })} /></label>
+        <label>Pérdida de evaluación continua: examen global % <input className="num" type="number" min={0} max={100} value={d.config.lec?.examPct ?? 50} onChange={(e) => cfg({ lec: { folderPct: d.config.lec?.folderPct ?? 50, examPct: num(e.target.value) } })} /></label>
+        <label>Extraordinaria: proyectos % <input className="num" type="number" min={0} max={100} value={d.config.extra?.projectsPct ?? 40} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), projectsPct: num(e.target.value) } })} /></label>
+        <label>Extraordinaria: examen % <input className="num" type="number" min={0} max={100} value={d.config.extra?.examPct ?? 60} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), examPct: num(e.target.value) } })} /></label>
+        <label>Extraordinaria: nota mínima en cada parte para hacer media (0 = sin mínimo) <input className="num" type="number" min={0} max={10} step="0.5" value={d.config.extra?.minEach ?? 0} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), minEach: num(e.target.value) } })} /></label>
         <label>Sesiones anuales previstas (0 = las pasadas lista) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>
       </div>
 

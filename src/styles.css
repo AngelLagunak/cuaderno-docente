@@ -60,3 +60,4 @@ table.t td.wrap { white-space:normal; min-width:130px; max-width:200px; }
   .card, .tw { border:0; }
   .wrap { max-width:none; padding:0; }
 }
+.recm { display:inline-block; font-size:.65rem; font-weight:700; color:var(--brand); border:1px solid var(--brand); border-radius:4px; padding:0 3px; margin-left:2px; vertical-align:super; }

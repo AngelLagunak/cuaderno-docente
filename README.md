@@ -78,3 +78,16 @@ Proyectos Artísticos calcula la nota según la cadena del currículo aragonés 
 6. Las **competencias clave** salen de las competencias específicas a través de los descriptores (radar, no nota).
 
 Una actividad sin criterios no cuenta para la nota en este modo. En Configuración → «Nota de cada evaluación» se puede volver a la media ponderada de instrumentos. Modelado y Maquetismo sigue por instrumentos (60/30/10) y evaluaciones 50/50.
+
+## Reglas de calificación (Fase 12)
+En **Cuaderno → Final**:
+- **Faltas**: % de faltas injustificadas con aviso ⚠ al llegar al 20 %. La **pérdida de evaluación continua (PEC)** la marcas tú; la nota pasa a ser carpeta 50 % + examen global 50 % (Modelado: dossier 40 % + prueba 60 %).
+- **Convocatoria extraordinaria** para quien no aprueba la ordinaria: proyectos 40 % + examen 60 %. En Proyectos Artísticos hace falta un 5 en ambas partes para hacer media; si no, suspenso (4 como máximo).
+- **Oficial**: la nota que va al acta (ordinaria, PEC o extraordinaria). Modelado y Maquetismo añade SS/AP/NT/SB.
+
+En **Cuaderno → Por actividad**:
+- **Rec.**: registra una recuperación. Cuenta la nota nueva y se guarda la anterior (marca R; se ve en Informes).
+- **T**: entrega fuera de plazo sin justificar. En Proyectos Artísticos no se puede recuperar; en Modelado resta un 30 %.
+- **∅**: entrega vacía o archivo corrupto, vale 0.
+
+Todo es configurable por materia en Configuración. La exportación CSV incluye Ordinaria, Vía y Oficial.

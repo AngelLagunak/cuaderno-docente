@@ -30,14 +30,19 @@ export function review(subject: Subject, nodes: CNode[], links: CLink[]): Issue[
 /**
  * Cambios en materias ya guardadas. Devuelve la materia cambiada o null si no hay nada que hacer.
  * - «Indicador» pasa a «Concreción» (así lo llama la programación), para no confundirlo con los indicadores de logro.
- * - Proyectos Artísticos calcula la nota por competencias específicas (si no se ha elegido otra cosa).
+ * - Los ajustes nuevos de cálculo que falten se toman del catálogo (p. ej. nota por competencias en Proyectos
+ *   Artísticos, reglas de recuperación y extraordinaria). Lo que el docente ya eligió no se toca.
  */
-export function migrateSubject(s: Subject): Subject | null {
+export function migrateSubject(s: Subject, catalog?: Subject): Subject | null {
   let changed = false;
   let config = s.config;
-  if (s.id === 'pa-1bach' && config.gradeLevel === undefined && s.levels.some((l) => l.key === 'ce')) {
-    config = { ...config, gradeLevel: 'ce' };
-    changed = true;
+  if (catalog) {
+    for (const [k, v] of Object.entries(catalog.config) as [keyof Subject['config'], unknown][]) {
+      if (config[k] === undefined && v !== undefined) {
+        config = { ...config, [k]: v };
+        changed = true;
+      }
+    }
   }
   const levels = s.levels.map((l) => {
     if (l.key === 'ind' && l.label === 'Indicador' && l.plural === 'Indicadores') {

@@ -36,14 +36,16 @@ describe('migrateSubject', () => {
   });
   it('pasa Proyectos Artísticos a nota por competencias específicas si no se había elegido', () => {
     const old = { ...pa.subject, config: { ...pa.subject.config, gradeLevel: undefined } };
-    expect(migrateSubject(old)!.config.gradeLevel).toBe('ce');
+    expect(migrateSubject(old, pa.subject)!.config.gradeLevel).toBe('ce');
     const chosen = { ...pa.subject, config: { ...pa.subject.config, gradeLevel: null } };
-    expect(migrateSubject(chosen)).toBeNull(); // el docente eligió instrumentos: se respeta
+    expect(migrateSubject(chosen, pa.subject)).toBeNull(); // el docente eligió instrumentos: se respeta
   });
   it('no toca materias ya renombradas o con nombres propios', () => {
-    expect(migrateSubject(pa.subject)).toBeNull();
+    expect(migrateSubject(pa.subject, pa.subject)).toBeNull();
     const custom = { ...pa.subject, levels: pa.subject.levels.map((l) => (l.key === 'ind' ? { ...l, label: 'Subcriterio' } : l)) };
     expect(migrateSubject(custom)).toBeNull();
-    expect(migrateSubject(mm.subject)).toBeNull();
+    expect(migrateSubject(mm.subject, mm.subject)).toBeNull();
+    const oldMm = { ...mm.subject, config: { ...mm.subject.config, scale: undefined, lec: undefined } };
+    expect(migrateSubject(oldMm, mm.subject)!.config).toMatchObject({ scale: 'ssapntsb', lec: { folderPct: 40, examPct: 60 } });
   });
 });

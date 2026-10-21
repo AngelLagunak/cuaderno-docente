@@ -4,6 +4,7 @@ import { Bar, BarChart, Legend, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Rada
 import { db } from '../data/db';
 import { useGroups, useNodes } from './hooks';
 import { activityBase, finalResult, indexGrades, itemGrades, noGrades, profile, round, wmean } from '../core/evaluation';
+import { outcome, scaleLabel } from '../core/rules';
 import type { Num, Profile } from '../core/evaluation';
 import type { Student, Subject } from '../core/model';
 
@@ -172,7 +173,14 @@ export function Reports({ subject }: { subject: Subject }) {
                   </tbody>
                 </table>
               </div>
-              <p><b>Nota final: {fmt(sr.fin.rounded, cfg.finalDecimals)}</b> {sr.fin.coverage < 1 && sr.fin.value != null && <span className="mute">(provisional)</span>}
+              {(() => {
+                const o = outcome(subject, acts, sr.m, { nodes, links }, student);
+                const sl = scaleLabel(subject, o.official);
+                return o.source !== 'ordinaria' ? (
+                  <p><b>Nota oficial: {fmt(o.official, cfg.finalDecimals)}{sl ? ` (${sl})` : ''}</b> <span className="mute">· {o.source}{o.lec ? ` (carpeta ${fmt(student.lecGrades?.folder ?? null, 1)}, examen ${fmt(student.lecGrades?.exam ?? null, 1)})` : ''}{o.extra ? ` (proyectos ${fmt(student.extra?.projects ?? null, 1)}, examen ${fmt(student.extra?.exam ?? null, 1)}${o.extra.blocked ? '; no hace media' : ''})` : ''}</span></p>
+                ) : sl ? <p><b>Calificación: {sl}</b></p> : null;
+              })()}
+              <p><b>{student.lec ? 'Ordinaria (no cuenta)' : 'Nota final ordinaria'}: {fmt(sr.fin.rounded, cfg.finalDecimals)}</b> {sr.fin.coverage < 1 && sr.fin.value != null && <span className="mute">(provisional)</span>}
                 {sr.fin.belowMin && <span className="warn"> · {gl ? `alguna ${glLabel.toLowerCase()} por debajo de ${cfg.passMark}` : 'algún instrumento bajo el mínimo'}</span>}</p>
               {gl && <p className="mute">Cada evaluación es la media de las {glPlural.toLowerCase()} evaluadas; cada criterio combina sus medidas con el peso de cada instrumento ({subject.instruments.map((i) => `${i.name} ${i.weight}`).join(', ')}).</p>}
             </div>
@@ -200,7 +208,8 @@ export function Reports({ subject }: { subject: Subject }) {
                       return (
                         <div className="issue sp" key={a.id}>
                           <span>{a.title} <span className="mute">· {subject.instruments.find((i) => i.id === a.instrumentId)?.name} · peso {a.weight}</span>
-                            {items.length > 0 && <div className="mute">Media de: {items.map((x) => `${nodeCode(x.nodeId!)} ${fmt(x.value, 1)}`).join(' · ')}</div>}
+                            {items.length > 0 && <div className="mute">Media de: {items.map((x) => `${nodeCode(x.nodeId!)} ${fmt(x.value, 1)}${x.recoveredAt ? ` (recuperado; antes ${fmt(x.prev ?? null, 1)})` : ''}`).join(' · ')}</div>}
+                            {g?.recoveredAt && <div className="mute">Recuperada el {g.recoveredAt}; antes {fmt(g.prev ?? null, 1)}</div>}
                           </span>
                           <span>{fmt(activityBase(a, sr.m), 1)}{g?.late ? ' (tardía)' : ''}</span>
                         </div>

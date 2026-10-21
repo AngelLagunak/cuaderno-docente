@@ -92,8 +92,9 @@ export const linkId = (subjectId: ID, relation: string, fromId: ID, toId: ID) =>
 
 export interface Group extends Stamp {
   id: ID; subjectId: ID; name: string; schoolYear: string; classroomCourseId?: string;
-  /** Horario semanal (1 = lunes) y festivos, para generar el calendario de sesiones. */
+  /** Horario semanal (1 = lunes), para generar el calendario de sesiones y calcular las sesiones previstas. */
   timetable?: { weekday: number; slot: string }[];
+  /** Festivos propios del grupo (antiguo): se suman a los del calendario escolar. */
   holidays?: string;
 }
 export interface Student extends Stamp {
@@ -172,6 +173,20 @@ export interface Session extends Stamp {
   unitId?: ID;
   topic: string;
   notes?: string;
+  /** Lo que se llegó a hacer y lo que queda pendiente para la sesión siguiente. */
+  done?: string;
+  pending?: string;
+}
+
+/** Calendario escolar de un curso (común a todas las materias y grupos). `id` = curso escolar, p. ej. «2026/27». */
+export interface SchoolCalendar extends Stamp {
+  id: string;
+  start: string; // AAAA-MM-DD
+  end: string;
+  /** Días no lectivos: una fecha o «inicio..fin» por línea, con su nombre detrás. */
+  holidays: string;
+  /** Fechas de cada evaluación, en orden (1.ª, 2.ª…). */
+  terms: { name: string; start: string; end: string }[];
 }
 
 export type AttStatus = 'P' | 'A' | 'R' | 'J';

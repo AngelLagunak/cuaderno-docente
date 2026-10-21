@@ -9,7 +9,7 @@ import { configured } from '../data/sync';
 import { applyPending, describe, pullActivity, pullGroup } from '../data/classroomSync';
 import type { PullResult } from '../data/classroomSync';
 import { PushGrades, RubricMap } from './ClassroomPanel';
-import { useGroups, useNodes } from './hooks';
+import { useGroups, useNodes, usePlannedSessions } from './hooks';
 import { activityBase, activityValue, indexGrades, profile, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
 import type { Num, StudentGrades } from '../core/evaluation';
 import { gradedLevels } from '../core/curriculum';
@@ -62,6 +62,7 @@ export function Notebook({ subject }: { subject: Subject }) {
   const [items, setItems] = useState(true);
   const [gid, setGid] = useState('');
   const group = groups.find((g) => g.id === gid) ?? groups[0];
+  const planned = usePlannedSessions(group);
   const atRaw = useLiveQuery(() => (group ? db.attendance.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const [view, setView] = useState<'table' | 'act' | 'final'>('table');
   const [termId, setTermId] = useState('');
@@ -342,7 +343,7 @@ export function Notebook({ subject }: { subject: Subject }) {
       )}
 
       {students.length > 0 && acts.length > 0 && view === 'final' && (
-        <FinalView subject={subject} students={students} acts={acts} sgOf={sgOf} curr={curr} att={(atRaw ?? []).filter((r) => !r.deleted)} partLabel={partLabel} />
+        <FinalView subject={subject} students={students} acts={acts} sgOf={sgOf} curr={curr} att={(atRaw ?? []).filter((r) => !r.deleted)} partLabel={partLabel} planned={planned} />
       )}
     </div>
   );

@@ -81,4 +81,7 @@ td.mxon { background:var(--chip); }
 .session .sp { align-items:center; gap:4px; }
 .session .sp b { white-space:nowrap; font-size:.8rem; }
 .session .sp select { width:auto; flex:1; min-width:0; }
+.session textarea { padding:4px 6px; font-size:.8rem; width:100%; min-width:0; }
+.session.done .sp b { color:var(--brand); }
+.pend { font-size:.8rem; color:var(--warn); border-left:3px solid var(--warn); padding:2px 6px; overflow-wrap:anywhere; }
 .day { min-width:0; }

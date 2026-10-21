@@ -5,11 +5,12 @@ import type { Activity, Attendance, Grade, Student, Subject } from './model';
 /** Faltas de un alumno. Base del %: sesiones anuales previstas o, si no hay, sesiones con lista pasada. */
 export interface AbsenceSummary { A: number; J: number; R: number; sessions: number; base: number; pct: number; warn: boolean }
 
-export function absenceSummary(subject: Subject, rows: Attendance[], studentId: string): AbsenceSummary {
+/** Base del %: sesiones anuales fijadas en Configuración, o las previstas por el calendario escolar, o las pasadas lista. */
+export function absenceSummary(subject: Subject, rows: Attendance[], studentId: string, planned?: number): AbsenceSummary {
   const live = rows.filter((r) => !r.deleted);
   const sessions = new Set(live.map((r) => `${r.date}|${r.slot}`)).size;
   const annual = subject.config.annualSessions ?? 0;
-  const base = annual > 0 ? annual : sessions;
+  const base = annual > 0 ? annual : planned && planned > 0 ? planned : sessions;
   const c = { A: 0, J: 0, R: 0 };
   for (const r of live) if (r.studentId === studentId && r.status !== 'P') c[r.status]++;
   const pct = base > 0 ? (c.A / base) * 100 : 0;

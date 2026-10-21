@@ -1,5 +1,6 @@
 import { linkId } from '../core/model';
 import type { CLink, CNode, Subject } from '../core/model';
+import { DESCRIPTORS, keyCompetence } from './descriptors';
 
 export const PA_ID = 'pa-1bach';
 // 0: el catálogo precargado nunca pisa a datos sincronizados.
@@ -88,34 +89,7 @@ const IND: [string, string][] = [
   ['5.1.2', 'Justificar la utilidad (teórica, informativa o inspiradora) de las fuentes o referentes.'],
 ];
 
-// Textos de descriptores abreviados (no son la redacción oficial completa).
-const DESC: [string, string][] = [
-  ['CCL1', 'Expresión oral, escrita o multimodal con fluidez y coherencia'],
-  ['CCL2', 'Comprensión e interpretación crítica de textos'],
-  ['CCL3', 'Búsqueda, selección y contraste de información'],
-  ['STEM1', 'Razonamiento matemático y resolución de problemas'],
-  ['STEM3', 'Resolución de problemas técnicos y gestión de dispositivos'],
-  ['CD1', 'Uso creativo, crítico y seguro de tecnologías digitales'],
-  ['CD2', 'Creación de contenidos digitales'],
-  ['CD3', 'Colaboración mediante entornos digitales'],
-  ['CPSAA1.1', 'Optimismo, resiliencia y autoeficacia'],
-  ['CPSAA1.2', 'Personalidad autónoma y gestión del cambio'],
-  ['CPSAA3.1', 'Empatía y conciencia de la influencia del grupo'],
-  ['CPSAA3.2', 'Reparto equitativo de tareas y responsabilidades'],
-  ['CPSAA4', 'Análisis y síntesis de información de los medios'],
-  ['CPSAA5', 'Planificación a largo plazo y aprendizaje autorregulado'],
-  ['CC3', 'Juicio propio ante problemas éticos y rechazo de la discriminación'],
-  ['CC4', 'Interdependencia, ecodependencia y compromiso con los ODS'],
-  ['CE1', 'Evaluar necesidades y afrontar retos con sentido crítico'],
-  ['CE2', 'Autoconocimiento y trabajo colaborativo en iniciativas'],
-  ['CE3', 'Crear ideas y gestionar proyectos hasta un prototipo final'],
-  ['CCEC2', 'Valoración y difusión del patrimonio cultural'],
-  ['CCEC3.1', 'Expresión de ideas y emociones mediante producciones artísticas'],
-  ['CCEC3.2', 'Generar y perfeccionar ideas: fuentes, técnicas, bocetos y maquetas'],
-  ['CCEC4.1', 'Planificar y ejecutar proyectos artísticos'],
-  ['CCEC4.2', 'Documentar y compartir el proceso creativo'],
-];
-
+// Descriptores que usan las competencias específicas de la materia (texto oficial en descriptors.ts).
 const CE_DESC: Record<string, string[]> = {
   '1': ['CCL1', 'STEM3', 'CD1', 'CD2', 'CPSAA1.1', 'CPSAA3.1', 'CE3', 'CCEC3.2', 'CCEC4.1'],
   '2': ['STEM1', 'CD3', 'CPSAA3.1', 'CPSAA3.2', 'CC4', 'CE1', 'CE2', 'CCEC4.1', 'CCEC4.2'],
@@ -124,16 +98,15 @@ const CE_DESC: Record<string, string[]> = {
   '5': ['CCL2', 'CCL3', 'CD1', 'CD2', 'CPSAA4', 'CPSAA5', 'CCEC2', 'CCEC4.2'],
 };
 
-const SABER: [string, string, string[]][] = [
-  ['PART.A.1', 'La creatividad como destreza personal y herramienta para la expresión artística', ['1.1']],
-  ['PART.A.2', 'Estrategias y técnicas de fomento y desarrollo de la creatividad', ['1.1']],
-  ['PART.A.3', 'Estrategias de superación del bloqueo creativo', ['1.1']],
-  ['PART.B.1', 'Metodología proyectual. Generación y selección de propuestas. Planificación, gestión y evaluación de proyectos artísticos. Difusión de resultados',
-    ['1.1', '1.2', '2.1', '2.2', '3.1', '3.2', '3.3', '4.1', '4.2', '4.3', '5.1', '5.2', '5.3', '5.4']],
-  ['PART.B.2', 'Estrategias de trabajo en equipo. Distribución de tareas y liderazgo compartido. Resolución de conflictos', ['2.1', '4.1', '4.2']],
-  ['PART.B.3', 'Estrategias, técnicas y soportes de documentación, registro y archivo', ['2.2', '3.1', '5.1', '5.2', '5.3', '5.4']],
-  ['PART.B.4', 'Sostenibilidad e impacto de los proyectos artísticos', ['2.1', '3.1', '4.3']],
-  ['PART.B.5', 'Oportunidades de desarrollo personal, social, académico y profesional relacionadas con el ámbito artístico. El emprendimiento cultural', ['3.1', '3.4']],
+const SABER: [string, string][] = [
+  ['PART.A.1', 'La creatividad como destreza personal y herramienta para la expresión artística'],
+  ['PART.A.2', 'Estrategias y técnicas de fomento y desarrollo de la creatividad'],
+  ['PART.A.3', 'Estrategias de superación del bloqueo creativo'],
+  ['PART.B.1', 'Metodología proyectual. Generación y selección de propuestas. Planificación, gestión y evaluación de proyectos artísticos. Difusión de resultados'],
+  ['PART.B.2', 'Estrategias de trabajo en equipo. Distribución de tareas y liderazgo compartido. Resolución de conflictos'],
+  ['PART.B.3', 'Estrategias, técnicas y soportes de documentación, registro y archivo'],
+  ['PART.B.4', 'Sostenibilidad e impacto de los proyectos artísticos'],
+  ['PART.B.5', 'Oportunidades de desarrollo personal, social, académico y profesional relacionadas con el ámbito artístico. El emprendimiento cultural'],
 ];
 
 const nodes: CNode[] = [];
@@ -148,13 +121,12 @@ IND.forEach(([c, t]) => {
   nodes.push(N('ind', c, t, tg(c)));
   links.push(K('ind-crit', nid('ind', c), nid('crit', c.slice(0, 3))));
 });
-DESC.forEach(([c, t]) => nodes.push(N('desc', c, t, { group: /^[A-Z]+/.exec(c)![0] })));
+[...new Set(Object.values(CE_DESC).flat())].sort((a, b) => Object.keys(DESCRIPTORS).indexOf(a) - Object.keys(DESCRIPTORS).indexOf(b))
+  .forEach((c) => nodes.push(N('desc', c, DESCRIPTORS[c], { group: keyCompetence(c) })));
 for (const [ce, ds] of Object.entries(CE_DESC))
   for (const d of ds) links.push(K('ce-desc', nid('ce', `CE.PA.${ce}`), nid('desc', d)));
-SABER.forEach(([c, t, crs]) => {
-  nodes.push(N('saber', c, t));
-  crs.forEach((cr) => links.push(K('saber-crit', nid('saber', c), nid('crit', cr))));
-});
+// Los saberes básicos definen contenidos, no se evalúan: se vinculan a las unidades didácticas, no a los criterios.
+SABER.forEach(([c, t]) => nodes.push(N('saber', c, t)));
 
 const subject: Subject = {
   id: PA_ID,
@@ -173,7 +145,6 @@ const subject: Subject = {
     { key: 'ind-crit', from: 'ind', to: 'crit', aggregate: true, needFrom: true },
     { key: 'crit-ce', from: 'crit', to: 'ce', aggregate: true, needFrom: true, needTo: true },
     { key: 'ce-desc', from: 'ce', to: 'desc', aggregate: true, needFrom: true },
-    { key: 'saber-crit', from: 'saber', to: 'crit', needFrom: true },
   ],
   instruments: [
     { id: 'proy', name: 'Proyectos', weight: 45 },

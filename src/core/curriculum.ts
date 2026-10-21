@@ -51,7 +51,24 @@ export function migrateSubject(s: Subject, catalog?: Subject): Subject | null {
     }
     return l;
   });
-  return changed ? { ...s, levels, config } : null;
+  // Relaciones que el catálogo ya no usa (los saberes no se vinculan a criterios: no se evalúan).
+  let relations = s.relations;
+  if (catalog && relations.some((r) => REMOVED_RELATIONS.includes(r.key) && !catalog.relations.some((c) => c.key === r.key))) {
+    relations = relations.filter((r) => !REMOVED_RELATIONS.includes(r.key) || catalog.relations.some((c) => c.key === r.key));
+    changed = true;
+  }
+  return changed ? { ...s, levels, config, relations } : null;
+}
+
+export const REMOVED_RELATIONS = ['saber-crit'];
+
+/** Elementos del catálogo que el docente no ha tocado (`updatedAt` 0) y cuyo texto ha cambiado en el catálogo. */
+export function refreshedCatalogNodes(current: CNode[], catalog: CNode[]): CNode[] {
+  const byId = new Map(current.map((n) => [n.id, n]));
+  return catalog.flatMap((c) => {
+    const n = byId.get(c.id);
+    return n && !n.deleted && n.updatedAt === 0 && (n.title !== c.title || n.group !== c.group) ? [{ ...n, title: c.title, group: c.group }] : [];
+  });
 }
 
 /** Niveles que se califican (criterio, concreción, aspecto…). */
@@ -113,7 +130,9 @@ export function levelColumns(subject: Subject): string[][] {
     }
   }
   const cols: string[][] = [];
-  for (const l of subject.levels) (cols[depth.get(l.key)!] ??= []).push(l.key);
+  // Los niveles sin relaciones (p. ej. saberes, que van en las unidades) no se dibujan si hay alguna relación.
+  const related = (k: string) => !subject.relations.length || subject.relations.some((r) => r.from === k || r.to === k);
+  for (const l of subject.levels) if (related(l.key)) (cols[depth.get(l.key)!] ??= []).push(l.key);
   return cols.filter(Boolean);
 }
 

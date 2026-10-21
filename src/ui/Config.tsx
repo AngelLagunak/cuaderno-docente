@@ -106,7 +106,7 @@ export function Config({ subject }: { subject: Subject }) {
         <label>Extraordinaria: proyectos % <input className="num" type="number" min={0} max={100} value={d.config.extra?.projectsPct ?? 40} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), projectsPct: num(e.target.value) } })} /></label>
         <label>Extraordinaria: examen % <input className="num" type="number" min={0} max={100} value={d.config.extra?.examPct ?? 60} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), examPct: num(e.target.value) } })} /></label>
         <label>Extraordinaria: nota mínima en cada parte para hacer media (0 = sin mínimo) <input className="num" type="number" min={0} max={10} step="0.5" value={d.config.extra?.minEach ?? 0} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), minEach: num(e.target.value) } })} /></label>
-        <label>Sesiones anuales previstas (0 = las pasadas lista) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>
+        <label>Sesiones anuales previstas (0 = las del calendario escolar y el horario del grupo) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>
       </div>
 
       <h3>Estructura curricular</h3>

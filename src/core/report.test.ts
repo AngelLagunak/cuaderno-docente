@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { criteriaText, criterionLevel } from './report';
-import { migrateSubject } from './curriculum';
+import { migrateSubject, refreshedCatalogNodes } from './curriculum';
 import type { Profile } from './evaluation';
 import { pa } from '../catalogs/pa';
 import { mm } from '../catalogs/mm';
@@ -29,6 +29,18 @@ describe('criteriaText ({{criterio}})', () => {
 });
 
 describe('migrateSubject', () => {
+  it('quita la relación saberes → criterios de las materias guardadas', () => {
+    const old = { ...pa.subject, relations: [...pa.subject.relations, { key: 'saber-crit', from: 'saber', to: 'crit', needFrom: true }] };
+    expect(migrateSubject(old, pa.subject)!.relations.map((r) => r.key)).toEqual(['ind-crit', 'crit-ce', 'ce-desc']);
+    const own = { ...mm.subject, relations: [{ key: 'saber-crit', from: 'saber', to: 'crit' }] };
+    expect(migrateSubject(own)).toBeNull(); // sin catálogo (materia propia) no se toca
+  });
+  it('actualiza los textos del catálogo solo en elementos sin editar', () => {
+    const d = pa.nodes.find((n) => n.code === 'STEM3')!;
+    const cur = [{ ...d, title: 'Resolución de problemas técnicos' }, { ...pa.nodes.find((n) => n.code === 'CCL1')!, title: 'Mi texto', updatedAt: 5 }];
+    expect(refreshedCatalogNodes(cur, pa.nodes)).toEqual([{ ...d, title: d.title }]);
+    expect(d.title).toMatch(/^Plantea y desarrolla proyectos/);
+  });
   it('renombra «Indicador» a «Concreción» en materias ya guardadas', () => {
     const old = { ...pa.subject, levels: pa.subject.levels.map((l) => (l.key === 'ind' ? { ...l, label: 'Indicador', plural: 'Indicadores' } : l)) };
     const m = migrateSubject(old)!;

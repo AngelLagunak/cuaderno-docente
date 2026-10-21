@@ -3,9 +3,11 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { useGroups, useNodes } from './hooks';
 import { NodePicker } from './NodePicker';
+import { Rubrics } from './Rubrics';
 import { callScript } from '../data/api';
 import type { CWork } from '../data/api';
-import type { Activity, CNode, Group, LearningUnit, Subject } from '../core/model';
+import { activitiesWithoutItems, coverage } from '../core/curriculum';
+import type { Activity, CNode, Group, LearningUnit, Rubric, Subject } from '../core/model';
 
 function UnitForm(p: { subject: Subject; nodes: CNode[]; init: LearningUnit; onDone: () => void }) {
   const [u, setU] = useState(p.init);
@@ -30,7 +32,7 @@ function UnitForm(p: { subject: Subject; nodes: CNode[]; init: LearningUnit; onD
   );
 }
 
-function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; init: Activity; onDone: () => void }) {
+function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; rubrics: Rubric[]; init: Activity; onDone: () => void }) {
   const [a, setA] = useState(p.init);
   const [w, setW] = useState(String(p.init.weight));
   const [pick, setPick] = useState(false);
@@ -53,10 +55,20 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; i
           {p.units.map((u) => <option key={u.id} value={u.id}>{u.code}</option>)}
         </select>
       </div>
-      <button className="small" onClick={() => setPick(!pick)}>Elementos curriculares, opcional ({a.nodeIds.length})</button>
+      <select value={a.rubricId ?? ''} onChange={(e) => setA({ ...a, rubricId: e.target.value || undefined })}>
+        <option value="">Sin rúbrica (nota numérica)</option>
+        {p.rubrics.map((r) => <option key={r.id} value={r.id}>Rúbrica: {r.name}</option>)}
+      </select>
+      <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
       {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
+      {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}
       <div className="row">
-        <button className="on" disabled={!a.title.trim()} onClick={async () => { await db.activities.put({ ...a, weight: Number(w) > 0 ? Number(w) : 1, updatedAt: Date.now() }); p.onDone(); }}>Guardar</button>
+        <button className="on" disabled={!a.title.trim()} onClick={async () => {
+          const rb = p.rubrics.find((r) => r.id === a.rubricId);
+          const nodeIds = [...new Set([...a.nodeIds, ...(rb?.rows.map((x) => x.nodeId) ?? [])])];
+          await db.activities.put({ ...a, nodeIds, weight: Number(w) > 0 ? Number(w) : 1, updatedAt: Date.now() });
+          p.onDone();
+        }}>Guardar</button>
         <button onClick={p.onDone}>Cancelar</button>
       </div>
     </div>
@@ -129,13 +141,14 @@ export function Planner({ subject }: { subject: Subject }) {
   const [eu, setEu] = useState<LearningUnit | null>(null);
   const [ea, setEa] = useState<Activity | null>(null);
   const [imp, setImp] = useState(false);
+  const rbRaw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
+  const rubrics = (rbRaw ?? []).filter((r) => !r.deleted).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
 
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const instName = (id: string) => subject.instruments.find((i) => i.id === id)?.name ?? '?';
-  const graded = subject.levels.filter((l) => l.graded).map((l) => l.key);
-  const cov = nodes.filter((n) => graded.includes(n.level)).map((n) => ({
-    n, ud: units.filter((u) => u.nodeIds.includes(n.id)).length, ac: acts.filter((a) => a.nodeIds.includes(n.id)).length,
-  }));
+  const cov = coverage(subject, nodes, lkRaw ?? [], units, acts);
+  const noItems = new Set(activitiesWithoutItems(subject, nodes, acts).map((a) => a.id));
 
   const newUnit = () => setEu({ id: uid(), subjectId: subject.id, code: `UD${units.length + 1}`, title: '', termId: subject.terms[0]?.id ?? '', plannedSessions: 0, nodeIds: [], updatedAt: Date.now() });
   const newAct = () => setEa({ id: uid(), subjectId: subject.id, groupId: group!.id, termId: subject.terms[0]?.id ?? '', instrumentId: subject.instruments[0]?.id ?? '', title: '', weight: 1, nodeIds: [], updatedAt: Date.now() });
@@ -173,7 +186,8 @@ export function Planner({ subject }: { subject: Subject }) {
             {group?.classroomCourseId && <button onClick={() => setImp(!imp)}>Importar de Classroom</button>}
           </div>
           {imp && group && <WorkImport subject={subject} group={group} existing={acts} onDone={() => setImp(false)} />}
-          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} init={ea} onDone={() => setEa(null)} />}
+          {noItems.size > 0 && <p className="warn">⚠ {noItems.size === 1 ? '1 actividad' : `${noItems.size} actividades`} sin criterio: solo admiten nota global y no aportan al perfil competencial.</p>}
+          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} rubrics={rubrics} init={ea} onDone={() => setEa(null)} />}
           {subject.terms.map((t) => {
             const list = acts.filter((a) => a.termId === t.id);
             return (
@@ -186,8 +200,9 @@ export function Planner({ subject }: { subject: Subject }) {
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : ''}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}
                         </div>
+                        {noItems.has(a.id) && <div className="warn mute">⚠ Sin criterio</div>}
                         <div className="chips">
                           {a.nodeIds.map((id) => byId.get(id)).filter((n): n is CNode => !!n).map((n) => <span className="chip" key={n.id} title={n.title}>{n.code}</span>)}
                         </div>
@@ -205,16 +220,34 @@ export function Planner({ subject }: { subject: Subject }) {
         </>
       )}
 
+      <h3>Rúbricas</h3>
+      <Rubrics subject={subject} nodes={nodes} />
+
       {cov.length > 0 && (
         <details className="card">
-          <summary>Cobertura curricular ({cov.filter((c) => c.ac === 0).length} sin actividades)</summary>
-          <p className="mute">Cuenta unidades y actividades del grupo seleccionado que incluyen cada elemento evaluable.</p>
-          {cov.map(({ n, ud, ac }) => (
-            <div className="issue" key={n.id}>
-              <b>{n.code}</b>
-              <span>{n.title.slice(0, 60)}{n.title.length > 60 ? '…' : ''} <span className={ac === 0 ? 'warn' : 'mute'}>— UD {ud} · act. {ac}</span></span>
-            </div>
-          ))}
+          <summary>Cobertura: criterio × instrumento ({cov.filter((c) => c.total === 0).length} sin actividades)</summary>
+          <p className="mute">Unidades y actividades del grupo seleccionado que evalúan cada elemento, por instrumento. Una actividad que evalúa un indicador cuenta también para su criterio.</p>
+          <div className="tw">
+            <table className="t c">
+              <thead>
+                <tr>
+                  <th>Elemento</th><th>UD</th>
+                  {subject.instruments.map((i) => <th key={i.id} title={i.name}>{i.name.slice(0, 10)}</th>)}
+                  <th className="sum">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cov.map(({ node, units: ud, byInstrument, total }) => (
+                  <tr key={node.id}>
+                    <td title={node.title}><b>{node.code}</b></td>
+                    <td className={ud === 0 ? 'warn' : ''}>{ud || '·'}</td>
+                    {subject.instruments.map((i) => <td key={i.id}>{byInstrument[i.id] || '·'}</td>)}
+                    <td className={'sum' + (total === 0 ? ' warn' : '')}>{total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </details>
       )}
     </div>

@@ -1,4 +1,5 @@
-import type { CLink, CNode, Subject } from './model';
+import type { Activity, CLink, CNode, LearningUnit, Subject } from './model';
+import { aggregateTree } from './evaluation';
 
 export interface Issue {
   key: string;
@@ -24,4 +25,50 @@ export function review(subject: Subject, nodes: CNode[], links: CLink[]): Issue[
     }
   }
   return issues;
+}
+
+/** Niveles que se califican (criterio, indicador, aspecto…). */
+export const gradedLevels = (subject: Subject) => new Set(subject.levels.filter((l) => l.graded).map((l) => l.key));
+
+/** Actividades que no evalúan ningún elemento calificable: no aportan al perfil ni admiten nota por criterio. */
+export function activitiesWithoutItems(subject: Subject, nodes: CNode[], activities: Activity[]): Activity[] {
+  const graded = gradedLevels(subject);
+  const ok = new Set(nodes.filter((n) => !n.deleted && graded.has(n.level)).map((n) => n.id));
+  return activities.filter((a) => !a.deleted && !a.nodeIds.some((id) => ok.has(id)));
+}
+
+export interface CoverageRow {
+  node: CNode;
+  units: number;
+  /** Actividades por instrumento. */
+  byInstrument: Record<string, number>;
+  total: number;
+}
+
+/**
+ * Cobertura de cada elemento calificable: unidades que lo incluyen y actividades por instrumento.
+ * Una actividad que evalúa un indicador también cubre su criterio.
+ */
+export function coverage(subject: Subject, nodes: CNode[], links: CLink[], units: LearningUnit[], activities: Activity[]): CoverageRow[] {
+  const graded = gradedLevels(subject);
+  const { ancestors } = aggregateTree(subject, links);
+  const reach = (ids: string[]) => {
+    const s = new Set(ids);
+    for (const id of ids) for (const p of ancestors(id)) s.add(p);
+    return s;
+  };
+  const ur = units.filter((u) => !u.deleted).map((u) => reach(u.nodeIds));
+  const ar = activities.filter((a) => !a.deleted).map((a) => ({ a, r: reach(a.nodeIds) }));
+  return nodes
+    .filter((n) => !n.deleted && graded.has(n.level))
+    .map((node) => {
+      const byInstrument: Record<string, number> = {};
+      let total = 0;
+      for (const { a, r } of ar) {
+        if (!r.has(node.id)) continue;
+        byInstrument[a.instrumentId] = (byInstrument[a.instrumentId] ?? 0) + 1;
+        total++;
+      }
+      return { node, units: ur.filter((r) => r.has(node.id)).length, byInstrument, total };
+    });
 }

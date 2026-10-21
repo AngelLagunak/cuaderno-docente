@@ -4,7 +4,7 @@ import { db } from './db';
 import { callScript } from './api';
 import type { Stamp } from '../core/model';
 
-const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates'];
+const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics'];
 type Rec = Stamp & { id: string; _v?: number };
 const tab = (t: string) => (db as unknown as Record<string, Table<Rec, string>>)[t];
 

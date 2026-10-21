@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveValue, finalResult, profile, round, termResult, wmean } from './evaluation';
+import { activityBase, activityValue, effectiveValue, finalResult, indexGrades, itemGrades, noGrades, profile, round, termResult, wmean } from './evaluation';
+import type { StudentGrades } from './evaluation';
 import type { Activity, Grade, Subject } from './model';
 import { pa } from '../catalogs/pa';
 import { mm } from '../catalogs/mm';
@@ -14,9 +15,12 @@ const act = (p: Partial<Activity> = {}): Activity => ({
   id: `a${n++}`, subjectId: PA.id, groupId: 'g', termId: 't1', instrumentId: 'proy',
   title: '', weight: 1, nodeIds: [], updatedAt: 0, ...p,
 });
-/** Notas de un alumno: [actividad, valor, tardía?]. */
-const grades = (rows: [Activity, number | null, boolean?][]) =>
-  new Map<string, Grade>(rows.map(([a, value, late]) => [a.id, { id: `s|${a.id}`, studentId: 's', activityId: a.id, value, late, updatedAt: 0 }]));
+/** Notas de un alumno: globales [actividad, valor, tardía?] y por criterio [actividad, nodo, valor]. */
+const grades = (rows: [Activity, number | null, boolean?][], items: [Activity, string, number | null][] = []): StudentGrades =>
+  indexGrades([
+    ...rows.map(([a, value, late]): Grade => ({ id: `s|${a.id}`, studentId: 's', activityId: a.id, value, late, updatedAt: 0 })),
+    ...items.map(([a, nodeId, value]): Grade => ({ id: `s|${a.id}|${nodeId}`, studentId: 's', activityId: a.id, nodeId, value, updatedAt: 0 })),
+  ]).get('s') ?? noGrades();
 const withCfg = (s: Subject, c: Partial<Subject['config']>): Subject => ({ ...s, config: { ...s.config, ...c } });
 
 describe('wmean y round', () => {
@@ -37,7 +41,7 @@ describe('wmean y round', () => {
 describe('effectiveValue', () => {
   it('aplica la penalización por entrega tardía de MM (30 %)', () => {
     const a = act();
-    const g = grades([[a, 8, true]]).get(a.id);
+    const g = grades([[a, 8, true]]).byActivity.get(a.id);
     expect(effectiveValue(g, mm.subject)).toBeCloseTo(5.6);
     expect(effectiveValue({ ...g!, late: false }, mm.subject)).toBe(8);
     expect(effectiveValue(undefined, mm.subject)).toBeNull();
@@ -96,7 +100,7 @@ describe('finalResult (30/30/40)', () => {
 });
 
 describe('profile (PA)', () => {
-  const prof = (acts: Activity[], g: Map<string, Grade>, termId?: string) =>
+  const prof = (acts: Activity[], g: StudentGrades, termId?: string) =>
     profile(PA, pa.nodes, pa.links, acts, g, termId);
 
   it('reproduce el ejemplo del documento de arquitectura (§7.2)', () => {
@@ -169,5 +173,64 @@ describe('profile (PA)', () => {
     const a = act({ subjectId: mm.subject.id, instrumentId: 'prac', nodeIds: ['mm-2joy/aspecto:UD1.1'] });
     const p = profile(mm.subject, mm.nodes, [], [a], grades([[a, 10, true]]));
     expect(p.nodes.get('mm-2joy/aspecto:UD1.1')).toBeCloseTo(7);
+  });
+});
+
+describe('notas por criterio', () => {
+  it('indexGrades separa la nota global de las notas por criterio e ignora las borradas', () => {
+    const a = act({ nodeIds: [ind('1.1.1')] });
+    const idx = indexGrades([
+      { id: `s|${a.id}`, studentId: 's', activityId: a.id, value: 6, updatedAt: 0 },
+      { id: `s|${a.id}|x`, studentId: 's', activityId: a.id, nodeId: ind('1.1.1'), value: 9, updatedAt: 0 },
+      { id: `t|${a.id}`, studentId: 't', activityId: a.id, value: 3, updatedAt: 0, deleted: true },
+    ]);
+    expect(idx.get('s')!.byActivity.get(a.id)!.value).toBe(6);
+    expect(idx.get('s')!.byItem.get(a.id)!.get(ind('1.1.1'))!.value).toBe(9);
+    expect(idx.has('t')).toBe(false);
+  });
+
+  it('la nota de la actividad es la media de sus criterios y se impone a la global', () => {
+    const a = act({ nodeIds: [ind('1.1.1'), ind('1.1.2'), ind('1.1.3')] });
+    const sg = grades([[a, 2]], [[a, ind('1.1.1'), 6], [a, ind('1.1.2'), 9], [a, ind('1.1.3'), null]]);
+    expect(itemGrades(a, sg).length).toBe(2);
+    expect(activityBase(a, sg)).toBe(7.5);
+    expect(activityBase(a, grades([[a, 2]]))).toBe(2);
+  });
+
+  it('ignora notas de criterios que la actividad ya no evalúa', () => {
+    const a = act({ nodeIds: [ind('1.1.1')] });
+    const sg = grades([[a, 5]], [[a, ind('1.1.2'), 10]]);
+    expect(activityBase(a, sg)).toBe(5);
+  });
+
+  it('aplica la entrega tardía (marcada en la nota global) a la media de criterios', () => {
+    const a = act({ subjectId: mm.subject.id, instrumentId: 'prac', nodeIds: ['mm-2joy/aspecto:UD1.1', 'mm-2joy/aspecto:UD1.2'] });
+    const sg = grades([[a, null, true]], [[a, 'mm-2joy/aspecto:UD1.1', 10], [a, 'mm-2joy/aspecto:UD1.2', 6]]);
+    expect(activityValue(a, sg, mm.subject)).toBeCloseTo(5.6);
+    const p = profile(mm.subject, mm.nodes, [], [a], sg);
+    expect(p.nodes.get('mm-2joy/aspecto:UD1.1')).toBeCloseTo(7);
+    expect(p.nodes.get('mm-2joy/aspecto:UD1.2')).toBeCloseTo(4.2);
+  });
+
+  it('la nota oficial usa la media de criterios', () => {
+    const p = act({ instrumentId: 'proy', nodeIds: [crit('3.2'), crit('4.2')] });
+    const e = act({ instrumentId: 'exam' });
+    const r = termResult(PA, [p, e], grades([[e, 4]], [[p, crit('3.2'), 10], [p, crit('4.2'), 6]]), 't1');
+    expect(r.byInstrument.find((i) => i.id === 'proy')!.value).toBe(8);
+    expect(r.value).toBeCloseTo((8 * 45 + 4 * 15) / 60);
+  });
+
+  it('en el perfil cada criterio recibe su propia nota, no la media de la actividad', () => {
+    const a = act({ nodeIds: [crit('3.2'), crit('4.2'), crit('5.2')] });
+    const pr = profile(PA, pa.nodes, pa.links, [a], grades([], [[a, crit('3.2'), 9], [a, crit('4.2'), 5]]));
+    expect(pr.nodes.get(crit('3.2'))).toBe(9);
+    expect(pr.nodes.get(crit('4.2'))).toBe(5);
+    expect(pr.nodes.get(crit('5.2'))).toBeNull(); // sin nota por criterio: no evaluado
+  });
+
+  it('no cuenta dos veces criterio e indicador calificados en la misma actividad', () => {
+    const a = act({ nodeIds: [crit('1.1'), ind('1.1.1'), ind('1.1.2')] });
+    const pr = profile(PA, pa.nodes, pa.links, [a], grades([], [[a, crit('1.1'), 2], [a, ind('1.1.1'), 6], [a, ind('1.1.2'), 8]]));
+    expect(pr.nodes.get(crit('1.1'))).toBe(7);
   });
 });

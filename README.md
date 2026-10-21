@@ -55,3 +55,9 @@ Regla: el repositorio es público. No subas nunca datos de alumnos ni tu token.
 - `src/core/*.test.ts` (vitest) prueban el cálculo con datos reales de los catálogos. Se ejecutan en GitHub Actions en cada subida; si fallan, no se publica.
 - Perfil competencial: cada actividad pesa lo mismo que en la nota final (trimestre × instrumento × peso dentro del instrumento). Si una actividad evalúa un criterio y uno de sus indicadores, la nota cuenta una sola vez.
 - Nota final mínima 1 tras redondear (SIGAD no admite 0). Ajustable en Configuración.
+
+## Nota por criterio y rúbricas (Fase 9)
+- **Nota por criterio**: en Cuaderno → Por actividad, cada alumno tiene una fila por criterio de la actividad. Si hay notas por criterio, la nota de la actividad es su media (sombreada en la tabla) y la nota global se ignora. En el perfil competencial cada criterio recibe su propia nota.
+- **Rúbricas propias** (Planificador → Rúbricas): 4 niveles con su nota (por defecto 2,5 / 5 / 7,5 / 10) y una fila por criterio con descriptores opcionales. Al asignar una rúbrica a una actividad se añaden sus criterios y se califica con un toque (1–4). Si cambias la nota de un nivel, se recalculan las notas puestas con esa rúbrica.
+- **Avisos**: actividades sin criterio, y tabla de cobertura criterio × instrumento.
+- Las notas anteriores se conservan como nota global; la base de datos local pasa a la versión 5 sin tocar los datos. No hay que actualizar el Apps Script.

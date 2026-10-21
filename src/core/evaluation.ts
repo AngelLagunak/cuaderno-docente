@@ -27,6 +27,55 @@ export function effectiveValue(g: Grade | undefined, subject: Subject): Num {
   return g.value * (1 - p / 100);
 }
 
+/** Notas de un alumno: global por actividad y por criterio (actividad → nodo → nota). */
+export interface StudentGrades {
+  byActivity: Map<string, Grade>;
+  byItem: Map<string, Map<string, Grade>>;
+}
+
+export const noGrades = (): StudentGrades => ({ byActivity: new Map(), byItem: new Map() });
+
+/** Agrupa las notas por alumno. Ignora las borradas. */
+export function indexGrades(rows: Grade[]): Map<string, StudentGrades> {
+  const out = new Map<string, StudentGrades>();
+  for (const g of rows) {
+    if (g.deleted) continue;
+    if (!out.has(g.studentId)) out.set(g.studentId, noGrades());
+    const sg = out.get(g.studentId)!;
+    if (!g.nodeId) sg.byActivity.set(g.activityId, g);
+    else {
+      if (!sg.byItem.has(g.activityId)) sg.byItem.set(g.activityId, new Map());
+      sg.byItem.get(g.activityId)!.set(g.nodeId, g);
+    }
+  }
+  return out;
+}
+
+/** Notas por criterio con valor, solo de nodos que la actividad sigue evaluando. */
+export function itemGrades(a: Activity, sg: StudentGrades): Grade[] {
+  const m = sg.byItem.get(a.id);
+  if (!m) return [];
+  return a.nodeIds.map((id) => m.get(id)).filter((g): g is Grade => g != null && g.value != null);
+}
+
+/** Nota de la actividad sin penalización: media de sus criterios si los hay; si no, la nota global. */
+export function activityBase(a: Activity, sg: StudentGrades): Num {
+  const items = itemGrades(a, sg);
+  if (items.length) return wmean(items.map((g): [Num, number] => [g.value, 1]));
+  return sg.byActivity.get(a.id)?.value ?? null;
+}
+
+/** Nota de la actividad con la penalización por entrega tardía (marcada en la nota global). */
+export function activityValue(a: Activity, sg: StudentGrades, subject: Subject): Num {
+  const v = activityBase(a, sg);
+  return v == null ? null : penalize(v, a, sg, subject);
+}
+
+function penalize(v: number, a: Activity, sg: StudentGrades, subject: Subject): number {
+  const p = sg.byActivity.get(a.id)?.late ? subject.config.latePenaltyPct : 0;
+  return v * (1 - p / 100);
+}
+
 export interface InstrumentResult { id: string; name: string; weight: number; value: Num }
 export interface TermResult {
   value: Num;
@@ -40,7 +89,7 @@ export interface TermResult {
 export function termResult(
   subject: Subject,
   activities: Activity[],
-  grades: Map<string, Grade>,
+  grades: StudentGrades,
   termId: string
 ): TermResult {
   const acts = activities.filter((a) => a.termId === termId);
@@ -51,7 +100,7 @@ export function termResult(
     value: wmean(
       acts
         .filter((a) => a.instrumentId === i.id)
-        .map((a): [Num, number] => [effectiveValue(grades.get(a.id), subject), a.weight])
+        .map((a): [Num, number] => [activityValue(a, grades, subject), a.weight])
     ),
   }));
   const value = wmean(byInstrument.map((i): [Num, number] => [i.value, i.weight]));
@@ -75,7 +124,7 @@ export interface FinalResult {
 export function finalResult(
   subject: Subject,
   activities: Activity[],
-  grades: Map<string, Grade>
+  grades: StudentGrades
 ): FinalResult {
   const terms = subject.terms.map((t) => ({
     id: t.id,
@@ -107,8 +156,8 @@ export interface Profile {
  * Peso de cada actividad calificada en la nota final: peso del trimestre × peso del instrumento ×
  * su parte dentro de las actividades calificadas de ese trimestre e instrumento.
  */
-function activityShares(subject: Subject, activities: Activity[], grades: Map<string, Grade>): Map<string, number> {
-  const graded = activities.filter((a) => effectiveValue(grades.get(a.id), subject) != null);
+function activityShares(subject: Subject, activities: Activity[], grades: StudentGrades): Map<string, number> {
+  const graded = activities.filter((a) => activityBase(a, grades) != null);
   const sums = new Map<string, number>();
   for (const a of graded) {
     const k = `${a.termId}|${a.instrumentId}`;
@@ -124,19 +173,8 @@ function activityShares(subject: Subject, activities: Activity[], grades: Map<st
   return out;
 }
 
-/**
- * Perfil competencial. Cada actividad con nodos vinculados aporta su nota a esos nodos, con el mismo
- * peso que tiene en la nota final. Los valores suben por las relaciones `aggregate`. Lo no evaluado
- * se ignora (no cuenta como 0). Todos los elementos del mismo nivel pesan igual.
- */
-export function profile(
-  subject: Subject,
-  nodes: CNode[],
-  links: CLink[],
-  activities: Activity[],
-  grades: Map<string, Grade>,
-  termId?: string
-): Profile {
+/** Hijos de cada nodo según las relaciones `aggregate` (el valor del hijo sube al padre). */
+export function aggregateTree(subject: Subject, links: CLink[]) {
   const children = new Map<string, string[]>();
   const parents = new Map<string, string[]>();
   for (const r of subject.relations.filter((x) => x.aggregate)) {
@@ -156,18 +194,39 @@ export function profile(
     }
     return seen;
   };
+  return { children, ancestors };
+}
 
+/**
+ * Perfil competencial. Cada actividad aporta a sus nodos con el mismo peso que tiene en la nota final:
+ * la nota de cada criterio calificado o, si no hay notas por criterio, la nota global a todos sus nodos.
+ * Los valores suben por las relaciones `aggregate`. Lo no evaluado se ignora (no cuenta como 0).
+ * Todos los elementos del mismo nivel pesan igual.
+ */
+export function profile(
+  subject: Subject,
+  nodes: CNode[],
+  links: CLink[],
+  activities: Activity[],
+  grades: StudentGrades,
+  termId?: string
+): Profile {
+  const { children, ancestors } = aggregateTree(subject, links);
   const acts = activities.filter((a) => !termId || a.termId === termId);
   const shares = activityShares(subject, acts, grades);
   const direct = new Map<string, Array<[Num, number]>>();
   for (const a of acts) {
-    const v = effectiveValue(grades.get(a.id), subject);
-    if (v == null) continue;
+    const items = itemGrades(a, grades);
+    const base = activityBase(a, grades);
+    if (base == null) continue;
+    const vals: [string, number][] = items.length
+      ? items.map((g) => [g.nodeId!, penalize(g.value!, a, grades, subject)])
+      : a.nodeIds.map((id) => [id, penalize(base, a, grades, subject)]);
     // Si la actividad evalúa un nodo y también a uno de sus descendientes, gana el más específico:
     // la nota ya sube al ancestro por la agregación y no debe contarse dos veces.
     const covered = new Set<string>();
-    for (const id of a.nodeIds) for (const p of ancestors(id)) covered.add(p);
-    for (const id of a.nodeIds) {
+    for (const [id] of vals) for (const p of ancestors(id)) covered.add(p);
+    for (const [id, v] of vals) {
       if (covered.has(id)) continue;
       if (!direct.has(id)) direct.set(id, []);
       direct.get(id)!.push([v, shares.get(a.id) ?? 0]);

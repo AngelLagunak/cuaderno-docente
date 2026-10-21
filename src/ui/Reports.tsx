@@ -3,9 +3,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Bar, BarChart, Legend, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { db } from '../data/db';
 import { useGroups, useNodes } from './hooks';
-import { finalResult, profile, round, wmean } from '../core/evaluation';
+import { activityBase, finalResult, indexGrades, itemGrades, noGrades, profile, round, wmean } from '../core/evaluation';
 import type { Num, Profile } from '../core/evaluation';
-import type { Grade, Student, Subject } from '../core/model';
+import type { Student, Subject } from '../core/model';
 
 const fmt = (v: Num, d: number) => (v == null ? '—' : v.toFixed(d).replace('.', ','));
 const tick = { fill: 'currentColor', fontSize: 11 };
@@ -32,8 +32,8 @@ export function Reports({ subject }: { subject: Subject }) {
   const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
   const links = useMemo(() => (lkRaw ?? []).filter((l) => !l.deleted), [lkRaw]);
 
-  const gm = useMemo(() => new Map((grRaw ?? []).filter((g) => !g.deleted).map((g) => [`${g.studentId}|${g.activityId}`, g])), [grRaw]);
-  const gradesOf = (s: Student) => new Map(acts.flatMap((a) => { const g = gm.get(`${s.id}|${a.id}`); return g ? [[a.id, g] as [string, Grade]] : []; }));
+  const idx = useMemo(() => indexGrades(grRaw ?? []), [grRaw]);
+  const gradesOf = (s: Student) => idx.get(s.id) ?? noGrades();
 
   const cfg = subject.config;
   const tid = periodId || undefined;
@@ -62,6 +62,7 @@ export function Reports({ subject }: { subject: Subject }) {
   if (!group) return <p className="mute">Crea un grupo y alumnos en la pestaña Grupos.</p>;
   const student = students.find((s) => s.id === sid) ?? students[0];
   const sr = rows.find((r) => r.s.id === student?.id);
+  const nodeCode = (id: string) => nodes.find((n) => n.id === id)?.code ?? '?';
   const termName = (id: string) => subject.terms.find((t) => t.id === id)?.name ?? '';
 
   const radar = (data: Record<string, unknown>[], series: [string, string, string][]) => (
@@ -162,11 +163,14 @@ export function Reports({ subject }: { subject: Subject }) {
                     <b className="mute">{t.name}</b>
                     {list.length === 0 && <p className="mute">Sin actividades.</p>}
                     {list.map((a) => {
-                      const g = gm.get(`${student.id}|${a.id}`);
+                      const g = sr.m.byActivity.get(a.id);
+                      const items = itemGrades(a, sr.m);
                       return (
                         <div className="issue sp" key={a.id}>
-                          <span>{a.title} <span className="mute">· {subject.instruments.find((i) => i.id === a.instrumentId)?.name} · peso {a.weight}</span></span>
-                          <span>{fmt(g?.value ?? null, 1)}{g?.late ? ' (tardía)' : ''}</span>
+                          <span>{a.title} <span className="mute">· {subject.instruments.find((i) => i.id === a.instrumentId)?.name} · peso {a.weight}</span>
+                            {items.length > 0 && <div className="mute">Media de: {items.map((x) => `${nodeCode(x.nodeId!)} ${fmt(x.value, 1)}`).join(' · ')}</div>}
+                          </span>
+                          <span>{fmt(activityBase(a, sr.m), 1)}{g?.late ? ' (tardía)' : ''}</span>
                         </div>
                       );
                     })}

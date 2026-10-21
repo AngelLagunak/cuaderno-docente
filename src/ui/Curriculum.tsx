@@ -1,4 +1,7 @@
-import { useMemo, useState } from 'react';
+import { Suspense, lazy, useMemo, useState } from 'react';
+import { CurriculumMatrix } from './CurriculumMatrix';
+
+const CurriculumMap = lazy(() => import('./CurriculumMap'));
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, deleteNode, saveNode, setLink, uid } from '../data/db';
 import { review } from '../core/curriculum';
@@ -47,7 +50,7 @@ export function Curriculum({ subject }: { subject: Subject }) {
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
 
   const [levelKey, setLevelKey] = useState(subject.levels[0]?.key ?? '');
-  const [view, setView] = useState<'cards' | 'review'>('cards');
+  const [view, setView] = useState<'cards' | 'matrix' | 'map' | 'review'>('cards');
   const [open, setOpen] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -111,12 +114,18 @@ export function Curriculum({ subject }: { subject: Subject }) {
     <div>
       <div className="row">
         <button className={view === 'cards' ? 'on' : ''} onClick={() => setView('cards')}>Elementos</button>
+        <button className={view === 'matrix' ? 'on' : ''} onClick={() => setView('matrix')}>Matriz</button>
+        <button className={view === 'map' ? 'on' : ''} onClick={() => setView('map')}>Mapa</button>
         <button className={view === 'review' ? 'on' : ''} onClick={() => setView('review')}>
           Revisión{issues.length ? ` (${issues.length})` : ''}
         </button>
       </div>
 
-      {view === 'review' ? (
+      {view === 'matrix' ? (
+        <CurriculumMatrix subject={subject} nodes={nodes} links={links} />
+      ) : view === 'map' ? (
+        <Suspense fallback={<p className="mute">Cargando mapa…</p>}><CurriculumMap subject={subject} nodes={nodes} links={allLinks ?? []} /></Suspense>
+      ) : view === 'review' ? (
         <div className="card">
           {issues.length === 0 && <p>Sin avisos.</p>}
           {issues.map((i) => {

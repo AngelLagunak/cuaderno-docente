@@ -103,6 +103,7 @@ export function App() {
         {view === 'hoy' && <Today nav={{
           attendance: (s, g, date, slot) => { setSid(s); setCurrentGroup(g); setView('att'); setAttPreset({ date, slot }); window.scrollTo(0, 0); },
           grade: (s, g, a) => { setSid(s); setCurrentGroup(g); setView('notes'); setFocusAct(a); window.scrollTo(0, 0); },
+          notebook: (s, g) => { setSid(s); setCurrentGroup(g); go('notes'); },
           go: (v) => go(v),
         }} />}
         {view === 'more' && (

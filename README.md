@@ -165,3 +165,8 @@ En Planificar → «Seguimiento ›», en el Cuaderno → «Resultados ›» o e
 - Hoy en dos columnas: la clase a la izquierda; lo que falta por corregir y los avisos a la derecha.
 - Cuaderno: en pantallas anchas, las acciones (Classroom, importar, exportar, SIGAD) se ven directamente en lugar del menú ⋯.
 - Pestañas internas (Asistencia, Planificar, Currículo, Informes) con el mismo control segmentado que el resto.
+
+## Hora de cada clase y entregas de Classroom (Fase 24)
+- **Calendario escolar → Horas del centro**: inicio y fin de cada sesión (1.ª a 7.ª). Con ellas, Hoy marca la clase que toca **ahora** según el reloj y muestra su horario.
+- **Por corregir** suma las **entregas de Classroom sin calificar** de los grupos vinculados (se consulta como mucho cada 15 minutos). Si la tarea está vinculada, abre esa actividad para calificar.
+- **Hay que actualizar el Apps Script** (nueva acción `classroom.pending`, sin permisos nuevos): pega el nuevo `apps-script/Code.gs` y crea una **Nueva versión** en Implementar → Gestionar implementaciones. No hace falta volver a autorizar.

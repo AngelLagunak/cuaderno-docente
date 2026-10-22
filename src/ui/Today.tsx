@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, uid } from '../data/db';
 import { addDays, parseHolidays, plannedSessions, schoolYearOf, ymd } from '../core/planning';
@@ -8,6 +8,37 @@ import { absenceSummary } from '../core/rules';
 import { DonePending } from './Calendar';
 import { useSchoolCalendar } from './hooks';
 import { Icon } from './icons';
+import { callScript } from '../data/api';
+import { configured } from '../data/sync';
+
+type ClsPending = { groupId: string; courseWorkId: string; title: string; turnedIn: number };
+/**
+ * Entregas de Classroom sin calificar en los grupos vinculados (necesita conexión y el Apps Script actualizado).
+ * Se guarda 15 minutos para no consultar en cada visita.
+ */
+function useClassroomPending(): ClsPending[] {
+  const [list, setList] = useState<ClsPending[]>(() => { try { const c = JSON.parse(sessionStorage.getItem('clsPending') || 'null'); return c && Date.now() - c.at < 15 * 60_000 ? c.list : []; } catch { return []; } });
+  useEffect(() => {
+    let done = false;
+    (async () => {
+      try { const c = JSON.parse(sessionStorage.getItem('clsPending') || 'null'); if (c && Date.now() - c.at < 15 * 60_000) return; } catch { /* sin almacenamiento */ }
+      if (!configured() || !navigator.onLine) return;
+      const groups = (await db.groups.toArray()).filter((g) => !g.deleted && g.classroomCourseId);
+      const out: ClsPending[] = [];
+      for (const g of groups) {
+        try {
+          const r = await callScript<{ courseWorkId: string; title: string; turnedIn: number }[]>('classroom.pending', { courseId: g.classroomCourseId });
+          out.push(...r.map((x) => ({ ...x, groupId: g.id })));
+        } catch { /* Apps Script sin actualizar o sin conexión: no se muestra */ }
+      }
+      if (done) return;
+      setList(out);
+      try { sessionStorage.setItem('clsPending', JSON.stringify({ at: Date.now(), list: out })); } catch { /* sin almacenamiento */ }
+    })();
+    return () => { done = true; };
+  }, []);
+  return list;
+}
 
 const DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -17,6 +48,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export interface TodayNav {
   attendance: (subjectId: string, groupId: string, date: string, slot: string) => void;
   grade: (subjectId: string, groupId: string, activityId: string) => void;
+  notebook: (subjectId: string, groupId: string) => void;
   go: (view: 'groups' | 'conn' | 'cal' | 'plan') => void;
 }
 
@@ -28,6 +60,11 @@ export function Today({ nav }: { nav: TodayNav }) {
   const today = ymd(new Date());
   const [date, setDate] = useState(today);
   const [pick, setPick] = useState<string | null>(null);
+  // Hora actual (HH:MM), al minuto, para saber qué clase toca.
+  const hhmm = () => new Date().toTimeString().slice(0, 5);
+  const [clock, setClock] = useState(hhmm);
+  useEffect(() => { const t = setInterval(() => setClock(hhmm()), 30_000); return () => clearInterval(t); }, []);
+  const pendingCls = useClassroomPending();
   const data = useLiveQuery(async () => {
     const [subjects, groups, sessions, attendance, units, activities, students] = await Promise.all([
       db.subjects.toArray(), db.groups.toArray(), db.sessions.toArray(), db.attendance.toArray(), db.units.toArray(), db.activities.toArray(), db.students.toArray(),
@@ -50,9 +87,9 @@ export function Today({ nav }: { nav: TodayNav }) {
     </div>
   );
 
-  const classes = classesOfDay(date, today, live, sessions, attendance, parseHolidays(cal?.holidays ?? ''));
+  const classes = classesOfDay(date, today, live, sessions, attendance, parseHolidays(cal?.holidays ?? ''), cal?.slots, clock);
   const key = (c: DayClass) => `${c.group.id}|${c.slot}`;
-  const sel = classes.find((c) => key(c) === pick) ?? classes.find((c) => c.state === 'next') ?? classes[0];
+  const sel = classes.find((c) => key(c) === pick) ?? classes.find((c) => c.state === 'now' || c.state === 'next') ?? classes[0];
   const moveDay = (n: number) => { setDate(addDays(date, n)); setPick(null); };
 
   // Por corregir
@@ -108,6 +145,20 @@ export function Today({ nav }: { nav: TodayNav }) {
 
       </div><div>
       <h2 className="sec">Por corregir</h2>
+      {pendingCls.length > 0 && (
+        <div className="card list">
+          {pendingCls.map((x) => {
+            const g = live.find((y) => y.id === x.groupId);
+            const a = data.activities.find((y) => !y.deleted && y.classroomWorkId === x.courseWorkId);
+            return (
+              <button key={x.groupId + x.courseWorkId} className="li" onClick={() => g && (a ? nav.grade(g.subjectId, g.id, a.id) : nav.notebook(g.subjectId, g.id))}>
+                <span><b>{a?.title ?? x.title}</b><span className="mute">{g?.name} · Classroom: {x.turnedIn} entregad{x.turnedIn === 1 ? 'a' : 'as'} sin calificar{a ? '' : ' (sin vincular)'}</span></span>
+                <Icon name="chev" size={18} />
+              </button>
+            );
+          })}
+        </div>
+      )}
       {pending.length ? (
         <div className="card list">
           {pending.map((p) => (
@@ -144,14 +195,15 @@ function ClassCard(p: { c: DayClass; date: string; today: string; subject: strin
   const prev = pendingBefore(p.sessions, c.group.id, p.date, c.slot);
   const rows = p.attendance.filter((r) => !r.deleted && r.groupId === c.group.id && r.date === p.date && r.slot === c.slot);
   const n = (k: string) => rows.filter((r) => r.status === k).length;
-  const badge = c.state === 'past' ? (rows.length ? 'Hecha' : 'Pasada') : c.state === 'next' ? 'Siguiente' : 'Más tarde';
+  const badge = c.state === 'past' ? (rows.length ? 'Hecha' : 'Pasada') : c.state === 'now' ? 'Ahora' : c.state === 'next' ? 'Siguiente' : 'Más tarde';
+  const main = c.state === 'now' || c.state === 'next';
   async function createSession() {
     await db.sessions.put({ id: uid(), groupId: c.group.id, date: p.date, slot: c.slot, topic: '', updatedAt: Date.now() });
     setNotes(true);
   }
   return (
     <section className="card class">
-      <div className="sp"><span className={'badge ' + c.state}>{badge} · {c.slot}.ª hora</span></div>
+      <div className="sp"><span className={'badge ' + (main ? 'next' : c.state)}>{badge} · {c.slot}.ª hora</span>{c.time && <span className="mute">{c.time.start} – {c.time.end}</span>}</div>
       <div>
         <div className="big">{c.group.name} · {p.subject}</div>
         <div className="ink2">{[u && `${u.code} ${u.title}`, s?.topic].filter(Boolean).join(' · ') || 'Sin unidad ni tema'}</div>
@@ -162,8 +214,8 @@ function ClassCard(p: { c: DayClass; date: string; today: string; subject: strin
         <div className="ink2">{s.done && <div><b>Realizado:</b> {s.done}</div>}{s.pending && <div><b>Queda pendiente:</b> {s.pending}</div>}</div>
       )}
       {p.date <= p.today && (
-        <button className={'wide' + (c.state === 'next' ? ' on big' : '')} onClick={p.onList}>
-          {c.state === 'next' && <Icon name="users" />} {rows.length ? 'Ver o corregir la lista' : 'Pasar lista'}
+        <button className={'wide' + (main ? ' on big' : '')} onClick={p.onList}>
+          {main && <Icon name="users" />} {rows.length ? 'Ver o corregir la lista' : 'Pasar lista'}
         </button>
       )}
       {notes && s ? <div className="form"><DonePending s={s} /></div> : (

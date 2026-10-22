@@ -12,6 +12,14 @@ describe('clases del día', () => {
     const c = classesOfDay('2026-10-21', '2026-10-21', [ba, jo], [ses('a', 'ba', '2026-10-21', '3')], [att('jo', '2026-10-21', '1')], new Set());
     expect(c.map((x) => [x.slot, x.group.id, !!x.session, x.state])).toEqual([['1', 'jo', false, 'past'], ['3', 'ba', true, 'next'], ['5', 'jo', false, 'later']]);
   });
+  it('con las horas del centro manda el reloj', () => {
+    const times = [{ slot: '1', start: '08:30', end: '09:25' }, { slot: '3', start: '10:20', end: '11:15' }, { slot: '5', start: '12:25', end: '13:20' }];
+    const at = (now: string) => classesOfDay('2026-10-21', '2026-10-21', [ba, jo], [], [], new Set(), times, now).map((x) => x.state);
+    expect(at('10:40')).toEqual(['past', 'now', 'later']);
+    expect(at('11:20')).toEqual(['past', 'past', 'next']);
+    expect(at('08:00')).toEqual(['next', 'later', 'later']);
+    expect(classesOfDay('2026-10-21', '2026-10-21', [ba], [], [], new Set(), times, '10:40')[0].time).toEqual(times[1]);
+  });
   it('días pasados y festivos', () => {
     expect(classesOfDay('2026-10-14', '2026-10-21', [ba], [], [], new Set()).map((x) => x.state)).toEqual(['past']);
     expect(classesOfDay('2026-10-28', '2026-10-21', [ba], [], [], new Set(['2026-10-28']))).toEqual([]);

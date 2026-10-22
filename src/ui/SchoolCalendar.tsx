@@ -139,6 +139,26 @@ export function SchoolCalendar() {
           </div>
         ))}
         <div className="row"><button className="small" onClick={() => set({ terms: [...d.terms, { name: `${d.terms.length + 1}.ª evaluación`, start: '', end: '' }] })}>+ Evaluación</button></div>
+        <details>
+          <summary className="mute">Horas del centro ({(d.slots ?? []).filter((x) => x.start && x.end).length} de 7): Hoy sabrá qué clase toca ahora</summary>
+          <div className="tw">
+            <table className="t">
+              <thead><tr><th>Sesión</th><th>Empieza</th><th>Acaba</th></tr></thead>
+              <tbody>
+                {['1', '2', '3', '4', '5', '6', '7'].map((h) => {
+                  const t = d.slots?.find((x) => x.slot === h) ?? { slot: h, start: '', end: '' };
+                  const put = (p: Partial<typeof t>) => set({ slots: [...(d.slots ?? []).filter((x) => x.slot !== h), { ...t, ...p }].sort((a, b) => a.slot.localeCompare(b.slot, 'es', { numeric: true })) });
+                  return (
+                    <tr key={h}><td>{h}.ª</td>
+                      <td><input type="time" aria-label={`Inicio de la ${h}.ª`} value={t.start} onChange={(e) => put({ start: e.target.value })} /></td>
+                      <td><input type="time" aria-label={`Fin de la ${h}.ª`} value={t.end} onChange={(e) => put({ end: e.target.value })} /></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </details>
         <label>Días no lectivos (una fecha o «inicio..fin» por línea, con su nombre detrás)
           <textarea rows={8} placeholder={'2026-10-12 Fiesta Nacional\n2026-12-23..2027-01-07 Navidad'} value={d.holidays} onChange={(e) => set({ holidays: e.target.value })} />
         </label>

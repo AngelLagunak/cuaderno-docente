@@ -170,3 +170,8 @@ En Planificar → «Seguimiento ›», en el Cuaderno → «Resultados ›» o e
 - **Calendario escolar → Horas del centro**: inicio y fin de cada sesión (1.ª a 7.ª). Con ellas, Hoy marca la clase que toca **ahora** según el reloj y muestra su horario.
 - **Por corregir** suma las **entregas de Classroom sin calificar** de los grupos vinculados (se consulta como mucho cada 15 minutos). Si la tarea está vinculada, abre esa actividad para calificar.
 - **Hay que actualizar el Apps Script** (nueva acción `classroom.pending`, sin permisos nuevos): pega el nuevo `apps-script/Code.gs` y crea una **Nueva versión** en Implementar → Gestionar implementaciones. No hace falta volver a autorizar.
+
+## Pantallas de ajustes en el móvil (Fase 25)
+- **Evaluación y configuración** en secciones plegables (asignatura, instrumentos, evaluaciones, cálculo, observaciones, estructura) y «Guardar» siempre a la vista, con aviso de cambios sin guardar. Ya no se sale de la pantalla en el móvil.
+- **Grupos y alumnos**: primero la lista del alumnado; importar de una lista o CSV queda plegado cuando el grupo ya tiene alumnos.
+- Planificar y Currículo: botones y vínculos más compactos; nada se apila ni se corta.

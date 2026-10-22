@@ -58,13 +58,14 @@ export function Config({ subject }: { subject: Subject }) {
 
   return (
     <div>
-      <div className="card form">
+      <details className="card sect" open><summary>Asignatura</summary>
+      <div className="inner form">
         <label>Nombre<input className="full" value={d.name} onChange={(e) => set({ name: e.target.value })} /></label>
         <label>Curso<input className="full" value={d.course} onChange={(e) => set({ course: e.target.value })} /></label>
-      </div>
+      </div></details>
 
-      <h3>Instrumentos de evaluación <span className="mute">(suma {sum(d.instruments)})</span></h3>
-      <div className="card">
+      <details className="card sect"><summary>Instrumentos de evaluación <span className="mute">(suma {sum(d.instruments)})</span></summary>
+      <div className="inner">
         {d.instruments.map((i, k) => (
           <div className="grid2" key={i.id}>
             <input value={i.name} onChange={(e) => set({ instruments: d.instruments.map((x, j) => (j === k ? { ...x, name: e.target.value } : x)) })} />
@@ -74,10 +75,10 @@ export function Config({ subject }: { subject: Subject }) {
         ))}
         <button className="small" onClick={() => set({ instruments: [...d.instruments, { id: 'i' + Date.now().toString(36), name: 'Nuevo instrumento', weight: 0 }] })}>+ Instrumento</button>
         <p className="mute">Los pesos son relativos: no hace falta que sumen 100.</p>
-      </div>
+      </div></details>
 
-      <h3>Evaluaciones <span className="mute">(suma {sum(d.terms)})</span></h3>
-      <div className="card">
+      <details className="card sect"><summary>Evaluaciones <span className="mute">(suma {sum(d.terms)})</span></summary>
+      <div className="inner">
         {d.terms.map((t, k) => (
           <div className="grid2" key={t.id}>
             <input value={t.name} onChange={(e) => set({ terms: d.terms.map((x, j) => (j === k ? { ...x, name: e.target.value } : x)) })} />
@@ -86,10 +87,10 @@ export function Config({ subject }: { subject: Subject }) {
           </div>
         ))}
         <button className="small" onClick={() => set({ terms: [...d.terms, { id: 't' + Date.now().toString(36), name: 'Nueva evaluación', weight: 0 }] })}>+ Evaluación</button>
-      </div>
+      </div></details>
 
-      <h3>Cálculo</h3>
-      <div className="card form">
+      <details className="card sect"><summary>Cálculo de la nota, recuperaciones y extraordinaria</summary>
+      <div className="inner form">
         <label>Nota de aprobado <input className="num" type="number" step="0.5" value={d.config.passMark} onChange={(e) => cfg({ passMark: num(e.target.value, 5) })} /></label>
         <label>Decimales en evaluaciones <input className="num" type="number" min={0} max={3} value={d.config.termDecimals} onChange={(e) => cfg({ termDecimals: num(e.target.value) })} /></label>
         <label>Decimales en la nota final <input className="num" type="number" min={0} max={3} value={d.config.finalDecimals} onChange={(e) => cfg({ finalDecimals: num(e.target.value) })} /></label>
@@ -116,10 +117,10 @@ export function Config({ subject }: { subject: Subject }) {
         <label>Extraordinaria: examen % <input className="num" type="number" min={0} max={100} value={d.config.extra?.examPct ?? 60} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), examPct: num(e.target.value) } })} /></label>
         <label>Extraordinaria: nota mínima en cada parte para hacer media (0 = sin mínimo) <input className="num" type="number" min={0} max={10} step="0.5" value={d.config.extra?.minEach ?? 0} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), minEach: num(e.target.value) } })} /></label>
         <label>Sesiones anuales previstas (0 = las del calendario escolar y el horario del grupo) <input className="num" type="number" min={0} value={d.config.annualSessions ?? 0} onChange={(e) => cfg({ annualSessions: num(e.target.value) })} /></label>
-      </div>
+      </div></details>
 
-      <h3>Observaciones del aula</h3>
-      <div className="card form">
+      <details className="card sect"><summary>Observaciones del aula</summary>
+      <div className="inner form">
         <p className="mute">Se marcan al pasar lista (Asistencia) y dan la nota de las actividades «Nota desde las observaciones del aula»: base + paso por cada marca positiva − paso por cada negativa.</p>
         {obs.map((o, k) => (
           <div className="row" key={o.id}>
@@ -134,10 +135,10 @@ export function Config({ subject }: { subject: Subject }) {
         <div className="row"><button className="small" onClick={() => setObs([...obs, { id: 'o' + Date.now().toString(36), label: 'Nueva observación', sign: 1 }])}>+ Observación</button></div>
         <label>Nota base (sin marcas) <input className="num" type="number" min={0} max={10} step="0.5" value={d.config.obsBase ?? 6} onChange={(e) => cfg({ obsBase: num(e.target.value, 6) })} /></label>
         <label>Paso por marca <input className="num" type="number" min={0} max={10} step="0.25" value={d.config.obsStep ?? 0.5} onChange={(e) => cfg({ obsStep: num(e.target.value, 0.5) })} /></label>
-      </div>
+      </div></details>
 
-      <h3>Estructura curricular</h3>
-      <div className="card">
+      <details className="card sect"><summary>Estructura curricular (avanzado)</summary>
+      <div className="inner">
         <b className="mute">Niveles</b>
         {d.levels.map((l, i) => (
           <div className="form" key={l.key} style={{ borderBottom: '1px solid var(--line)', paddingBottom: 8 }}>
@@ -167,11 +168,11 @@ export function Config({ subject }: { subject: Subject }) {
           <select value={rt} onChange={(e) => setRt(e.target.value)}>{d.levels.map((l) => <option key={l.key} value={l.key}>{l.label}</option>)}</select>
           <button className="small" onClick={addRelation}>+ Relación</button>
         </div>
-      </div>
+      </div></details>
 
-      <div className="row">
+      <div className="row savebar">
         <button className="on" onClick={async () => { await saveSubject(d); setSaved(true); }}>Guardar configuración</button>
-        {saved && <span className="mute">Guardado</span>}
+        {saved ? <span className="mute">Guardado</span> : JSON.stringify(d) !== JSON.stringify(subject) && <span className="warn">Cambios sin guardar</span>}
         <button className="small" onClick={removeSubject}>Borrar asignatura</button>
       </div>
     </div>

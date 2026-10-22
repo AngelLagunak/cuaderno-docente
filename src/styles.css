@@ -236,3 +236,18 @@ h2.h2 { margin:0 0 10px; font-size:1rem; }
   .todayGrid { display:grid; grid-template-columns:minmax(0, 1.2fr) minmax(0, 1fr); gap:24px; align-items:start; }
   .todayGrid h2.sec:first-child { margin-top:8px; }
 }
+
+/* ---------- Formularios: nada se sale de la pantalla en el móvil ---------- */
+input, select, textarea { max-width:100%; }
+label { overflow-wrap:anywhere; }
+.grid2 > * { min-width:0; width:100%; }
+.grid2 { grid-template-columns:minmax(0, 1fr) 76px 40px; }
+.sp > div:first-child { min-width:0; }
+.card.sp > .row { flex-wrap:nowrap; flex:none; align-self:flex-start; }
+details.sect { padding:0; }
+details.sect > summary { cursor:pointer; padding:14px; font-weight:700; list-style-position:inside; }
+details.sect[open] > summary { border-bottom:1px solid var(--line2); }
+details.sect > .inner { padding:12px 14px 14px; }
+.savebar { position:sticky; bottom:calc(72px + env(safe-area-inset-bottom)); z-index:5; background:var(--bg); padding:8px 0; margin:0; }
+@media (min-width: 900px) { .savebar { bottom:0; } }
+button.chip { min-height:32px; padding:3px 12px; font-weight:500; }

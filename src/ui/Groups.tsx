@@ -163,21 +163,24 @@ export function Groups({ subject }: { subject: Subject }) {
       {group && (
         <>
           <div className="card">
-            <b>Importar alumnos</b>
-            <p className="mute">Una línea por alumno: Apellidos, Nombre, correo, NIA (separadores coma, punto y coma o tabulador). Pega la lista o sube un CSV.</p>
-            <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="García López, Ana, ana@correo.es, 123456" />
-            <div className="row">
-              <button className="on" disabled={!paste.trim()} onClick={() => importRows(paste)}>Importar</button>
-              <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setPaste(await f.text()); }} />
-            </div>
-            {msg && <p className="mute">{msg}</p>}
-          </div>
-          <ClassroomImport key={group.id + (group.classroomCourseId ?? '')} group={group} students={students} />
-          <div className="card">
             <b>{students.length} alumnos</b>
+            {students.length === 0 && <p className="mute">Aún no hay alumnos: impórtalos de una lista, de un CSV o de Classroom.</p>}
             {students.map((s) => <StudentRow key={s.id + s.updatedAt} s={s} />)}
             <button className="small" onClick={() => db.students.put({ id: uid(), groupId: group.id, firstName: 'Nombre', lastName: 'Apellidos', updatedAt: Date.now() })}>+ Alumno</button>
           </div>
+          <details className="card sect" open={students.length === 0}>
+            <summary>Importar alumnos de una lista o CSV</summary>
+            <div className="inner form">
+              <p className="mute">Una línea por alumno: Apellidos, Nombre, correo, NIA (separadores coma, punto y coma o tabulador). Pega la lista o sube un CSV.</p>
+              <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="García López, Ana, ana@correo.es, 123456" />
+              <div className="row">
+                <button className="on" disabled={!paste.trim()} onClick={() => importRows(paste)}>Importar</button>
+                <input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={async (e) => { const f = e.target.files?.[0]; if (f) setPaste(await f.text()); }} />
+              </div>
+              {msg && <p className="mute">{msg}</p>}
+            </div>
+          </details>
+          <ClassroomImport key={group.id + (group.classroomCourseId ?? '')} group={group} students={students} />
         </>
       )}
     </div>

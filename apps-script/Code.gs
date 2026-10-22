@@ -24,6 +24,9 @@ function doPost(e) {
       case 'classroom.grades':
         out = { ok: true, data: grades_(req.courseId, req.courseWorkId) };
         break;
+      case 'classroom.pending':
+        out = { ok: true, data: pending_(req.courseId) };
+        break;
       case 'classroom.work.create':
         out = { ok: true, data: workCreate_(req) };
         break;
@@ -104,6 +107,18 @@ function workList_(courseId) {
       dueDate: d ? d.year + '-' + pad_(d.month) + '-' + pad_(d.day) : ''
     };
   });
+}
+
+/** Entregas sin calificar del curso: por tarea, cuántas están entregadas (TURNED_IN) y aún no devueltas con nota. */
+function pending_(courseId) {
+  var subs = all_('/v1/courses/' + enc_(courseId) + '/courseWork/-/studentSubmissions?states=TURNED_IN&pageSize=100', 'studentSubmissions');
+  var by = {};
+  subs.forEach(function (s) { if (s.assignedGrade === undefined) by[s.courseWorkId] = (by[s.courseWorkId] || 0) + 1; });
+  var ids = Object.keys(by);
+  if (!ids.length) return [];
+  var titles = {};
+  workList_(courseId).forEach(function (w) { titles[w.id] = w.title; });
+  return ids.map(function (id) { return { courseWorkId: id, title: titles[id] || '', turnedIn: by[id] }; });
 }
 
 function rubricGrades_(s) {

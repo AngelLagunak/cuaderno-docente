@@ -1,14 +1,14 @@
 import { bySessionOrder, weekday } from './planning';
-import type { Activity, Attendance, Grade, Group, Session, Student } from './model';
+import type { Activity, Attendance, Grade, Group, Session, SlotTime, Student } from './model';
 
-export interface DayClass { group: Group; slot: string; session?: Session; state: 'past' | 'next' | 'later' }
+export interface DayClass { group: Group; slot: string; session?: Session; state: 'past' | 'now' | 'next' | 'later'; time?: SlotTime }
 
 /**
  * Clases de un día en todos los grupos: las sesiones planificadas y, si no las hay, las horas del horario semanal
- * (salvo días no lectivos). Estado: pasada (anterior a hoy o con lista pasada), siguiente (la primera de hoy sin
- * lista) o más tarde.
+ * (salvo días no lectivos). Estado: pasada, ahora, siguiente o más tarde. Con las horas del centro (`times`) y la hora
+ * actual (`now`, HH:MM) se usa el reloj; si no, pasada = con lista pasada y siguiente = la primera de hoy sin lista.
  */
-export function classesOfDay(date: string, today: string, groups: Group[], sessions: Session[], attendance: Attendance[], holidays: Set<string>): DayClass[] {
+export function classesOfDay(date: string, today: string, groups: Group[], sessions: Session[], attendance: Attendance[], holidays: Set<string>, times: SlotTime[] = [], now = ''): DayClass[] {
   const live = groups.filter((g) => !g.deleted);
   const out: Omit<DayClass, 'state'>[] = [];
   for (const g of live) {
@@ -19,14 +19,17 @@ export function classesOfDay(date: string, today: string, groups: Group[], sessi
   }
   out.sort((a, b) => a.slot.localeCompare(b.slot, 'es', { numeric: true }) || a.group.name.localeCompare(b.group.name, 'es'));
   const held = (c: Omit<DayClass, 'state'>) => attendance.some((r) => !r.deleted && r.groupId === c.group.id && r.date === date && r.slot === c.slot);
-  let nextGiven = false;
-  return out.map((c) => {
-    let state: DayClass['state'];
-    if (date < today || (date === today && held(c))) state = 'past';
-    else if (date === today && !nextGiven) { state = 'next'; nextGiven = true; }
-    else state = 'later';
-    return { ...c, state };
+  const timeOf = (slot: string) => times.find((t) => t.slot === slot && t.start && t.end);
+  const states = out.map((c): DayClass['state'] => {
+    const t = timeOf(c.slot);
+    if (date < today) return 'past';
+    if (date > today) return 'later';
+    if (t && now) return now >= t.end ? 'past' : now >= t.start ? 'now' : 'later';
+    return held(c) ? 'past' : 'later';
   });
+  // Si no hay ninguna en curso, la primera que queda hoy es la siguiente.
+  if (date === today && !states.includes('now')) { const i = states.indexOf('later'); if (i >= 0) states[i] = 'next'; }
+  return out.map((c, i) => ({ ...c, state: states[i], time: timeOf(c.slot) }));
 }
 
 /** Lo pendiente de la sesión anterior del grupo a una fecha y hora (aunque esa hora aún no tenga sesión creada). */

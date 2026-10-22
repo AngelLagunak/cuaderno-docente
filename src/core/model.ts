@@ -203,7 +203,10 @@ export interface SchoolCalendar extends Stamp {
   holidays: string;
   /** Fechas de cada evaluación, en orden (1.ª, 2.ª…). */
   terms: { name: string; start: string; end: string }[];
+  /** Horas del centro: inicio y fin de cada sesión del día («1» → 08:30–09:25). */
+  slots?: SlotTime[];
 }
+export interface SlotTime { slot: string; start: string; end: string }
 
 export type AttStatus = 'P' | 'A' | 'R' | 'J';
 

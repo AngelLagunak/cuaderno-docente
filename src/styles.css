@@ -251,3 +251,5 @@ details.sect > .inner { padding:12px 14px 14px; }
 .savebar { position:sticky; bottom:calc(72px + env(safe-area-inset-bottom)); z-index:5; background:var(--bg); padding:8px 0; margin:0; }
 @media (min-width: 900px) { .savebar { bottom:0; } }
 button.chip { min-height:32px; padding:3px 12px; font-weight:500; }
+.setup .li:disabled { opacity:1; cursor:default; }
+.setup .li .done { color:var(--okink); }

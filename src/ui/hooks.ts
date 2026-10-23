@@ -6,7 +6,7 @@ import type { Group } from '../core/model';
 
 export function useGroups(subjectId: string) {
   const r = useLiveQuery(() => db.groups.where('subjectId').equals(subjectId).toArray(), [subjectId]);
-  return useMemo(() => (r ?? []).filter((g) => !g.deleted), [r]);
+  return useMemo(() => (r ?? []).filter((g) => !g.deleted).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true })), [r]);
 }
 
 export function useNodes(subjectId: string) {

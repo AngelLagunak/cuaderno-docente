@@ -175,3 +175,8 @@ En Planificar → «Seguimiento ›», en el Cuaderno → «Resultados ›» o e
 - **Evaluación y configuración** en secciones plegables (asignatura, instrumentos, evaluaciones, cálculo, observaciones, estructura) y «Guardar» siempre a la vista, con aviso de cambios sin guardar. Ya no se sale de la pantalla en el móvil.
 - **Grupos y alumnos**: primero la lista del alumnado; importar de una lista o CSV queda plegado cuando el grupo ya tiene alumnos.
 - Planificar y Currículo: botones y vínculos más compactos; nada se apila ni se corta.
+
+## Asignatura y grupo por separado, puesta en marcha e icono (Fase 26)
+- Arriba se elige la **asignatura** (Proyectos Artísticos, Modelado y Maquetismo II…) y, en las pantallas con alumnado, el **grupo** con un botón por grupo (1.º B, 1.º C, 1.º D). Currículo y Evaluación y configuración son de la asignatura: solo llevan la asignatura.
+- **Hoy → Puesta en marcha**: lista de lo que falta para que todo funcione solo (conexión, calendario escolar, horas del centro, horario de cada grupo, alumnado, unidades y copia de seguridad); cada paso lleva a su pantalla. Se puede ocultar.
+- Icono de la app nuevo (también como icono adaptable en Android).

@@ -50,6 +50,7 @@ export interface TodayNav {
   grade: (subjectId: string, groupId: string, activityId: string) => void;
   notebook: (subjectId: string, groupId: string) => void;
   go: (view: 'groups' | 'conn' | 'cal' | 'plan') => void;
+  groups: (subjectId: string, groupId: string) => void;
 }
 
 /**
@@ -65,6 +66,7 @@ export function Today({ nav }: { nav: TodayNav }) {
   const [clock, setClock] = useState(hhmm);
   useEffect(() => { const t = setInterval(() => setClock(hhmm()), 30_000); return () => clearInterval(t); }, []);
   const pendingCls = useClassroomPending();
+  const [hideSetup, setHideSetup] = useState(() => { try { return localStorage.getItem('setupHidden') === '1'; } catch { return false; } });
   const data = useLiveQuery(async () => {
     const [subjects, groups, sessions, attendance, units, activities, students] = await Promise.all([
       db.subjects.toArray(), db.groups.toArray(), db.sessions.toArray(), db.attendance.toArray(), db.units.toArray(), db.activities.toArray(), db.students.toArray(),
@@ -86,6 +88,19 @@ export function Today({ nav }: { nav: TodayNav }) {
       <button className="on" onClick={() => nav.go('groups')}>Crear un grupo</button>
     </div>
   );
+
+  // Puesta en marcha: lo que hace falta para que todo funcione solo.
+  const noStudents = live.find((g) => !data.students.some((x) => !x.deleted && x.groupId === g.id));
+  const setup: [string, boolean, () => void][] = [
+    ['Conectar con Drive y Classroom (Conexión y copias)', configured(), () => nav.go('conn')],
+    ['Guardar el calendario escolar del curso', !!cal, () => nav.go('cal')],
+    ['Poner las horas del centro (Calendario escolar)', !!cal?.slots?.some((x) => x.start && x.end), () => nav.go('cal')],
+    ['Marcar el horario de cada grupo (Calendario escolar)', live.every((g) => g.timetable?.length), () => nav.go('cal')],
+    [noStudents ? `Añadir el alumnado de ${noStudents.name}` : 'Añadir el alumnado de cada grupo', !noStudents, () => (noStudents ? nav.groups(noStudents.subjectId, noStudents.id) : nav.go('groups'))],
+    ['Crear las unidades didácticas (Planificar)', data.units.some((u) => !u.deleted), () => nav.go('plan')],
+    ['Descargar una copia de seguridad', (() => { try { return !!localStorage.getItem('lastBackup'); } catch { return false; } })(), () => nav.go('conn')],
+  ];
+  const setupLeft = setup.filter((x) => !x[1]);
 
   const classes = classesOfDay(date, today, live, sessions, attendance, parseHolidays(cal?.holidays ?? ''), cal?.slots, clock);
   const key = (c: DayClass) => `${c.group.id}|${c.slot}`;
@@ -115,6 +130,19 @@ export function Today({ nav }: { nav: TodayNav }) {
 
   return (
     <div className="today">
+      {!hideSetup && setupLeft.length > 0 && (
+        <details className="card sect setup" open={setupLeft.length > 2}>
+          <summary>Puesta en marcha · {setup.length - setupLeft.length} de {setup.length}</summary>
+          <div className="list">
+            {setup.map(([t, ok, f]) => (
+              <button key={t} className="li" disabled={ok} onClick={f}>
+                <span className={ok ? 'done' : ''}>{ok ? '✓ ' : ''}{t}</span>{!ok && <Icon name="chev" size={18} />}
+              </button>
+            ))}
+          </div>
+          <div className="row" style={{ padding: '0 14px 10px' }}><button className="small" onClick={() => { try { localStorage.setItem('setupHidden', '1'); } catch { /* sin almacenamiento */ } setHideSetup(true); }}>Ocultar</button></div>
+        </details>
+      )}
       <div className="daynav">
         <button aria-label="Día anterior" onClick={() => moveDay(-1)}><Icon name="left" /></button>
         <b>{date === today ? `Hoy, ${longDate(date)}` : cap(longDate(date))}</b>

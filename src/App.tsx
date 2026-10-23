@@ -30,6 +30,8 @@ const SECTIONS: { title: string; items: [View, string, string][] }[] = [
 const TITLE: Record<View, string> = { hoy: 'Hoy', notes: 'Cuaderno', plan: 'Planificar', seg: 'Seguimiento', more: 'Más', att: 'Asistencia', groups: 'Grupos y alumnos', rep: 'Informes', comm: 'Comunicación', curr: 'Currículo', config: 'Evaluación y configuración', cal: 'Calendario escolar', conn: 'Conexión y copias', new: 'Nueva asignatura' };
 /** Pantallas que trabajan sobre una asignatura y un grupo (llevan el selector arriba). */
 const WITH_CONTEXT = new Set<View>(['notes', 'plan', 'seg', 'att', 'groups', 'rep', 'comm', 'curr', 'config']);
+/** Pantallas de la asignatura (no dependen del grupo). */
+const SUBJECT_ONLY = new Set<View>(['curr', 'config']);
 
 function SyncBar() {
   const st = useSyncStatus();
@@ -66,18 +68,28 @@ export function App() {
 
   const subject = subjects?.find((s) => s.id === sid) ?? subjects?.[0];
   const go = (v: View) => { setView(v); setAttPreset(undefined); setFocusAct(undefined); window.scrollTo(0, 0); };
-  const ctxValue = `${subject?.id ?? ''}|${groups.some((g) => g.id === gid && g.subjectId === subject?.id) ? gid : groups.find((g) => g.subjectId === subject?.id)?.id ?? ''}`;
   const section = view === 'seg' ? 'plan' : MAIN.some(([v]) => v === view) ? view : 'more';
 
+  // Arriba: la asignatura y, en las pantallas que trabajan con alumnado, su grupo.
+  const subjGroups = groups.filter((g) => g.subjectId === subject?.id).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+  const curGroup = subjGroups.find((g) => g.id === gid) ?? subjGroups[0];
   const context = subjects && WITH_CONTEXT.has(view) && (
-    <select className="ctx" aria-label="Grupo y asignatura" value={ctxValue} onChange={(e) => { const [s, g] = e.target.value.split('|'); setSid(s); if (g) setCurrentGroup(g); }}>
-      {subjects.map((s) => {
-        const gs = groups.filter((g) => g.subjectId === s.id);
-        return gs.length
-          ? gs.map((g) => <option key={g.id} value={`${s.id}|${g.id}`}>{g.name} · {s.name}</option>)
-          : <option key={s.id} value={`${s.id}|`}>{s.name} (sin grupos)</option>;
-      })}
-    </select>
+    <>
+      <select className="ctx" aria-label="Asignatura" value={subject?.id ?? ''} onChange={(e) => {
+        setSid(e.target.value);
+        const g = groups.find((x) => x.subjectId === e.target.value);
+        if (g) setCurrentGroup(g.id);
+      }}>
+        {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+      {!SUBJECT_ONLY.has(view) && subjGroups.length > 1 && (
+        <div className="seg" role="group" aria-label="Grupo">
+          {subjGroups.map((g) => <button key={g.id} aria-pressed={g.id === curGroup?.id} className={g.id === curGroup?.id ? 'on' : ''} onClick={() => setCurrentGroup(g.id)}>{g.name}</button>)}
+        </div>
+      )}
+      {!SUBJECT_ONLY.has(view) && subjGroups.length === 1 && <span className="mute">Grupo {subjGroups[0].name}</span>}
+      {!SUBJECT_ONLY.has(view) && subjGroups.length === 0 && view !== 'groups' && <button className="small" onClick={() => go('groups')}>Crear un grupo</button>}
+    </>
   );
 
   return (
@@ -104,6 +116,7 @@ export function App() {
           attendance: (s, g, date, slot) => { setSid(s); setCurrentGroup(g); setView('att'); setAttPreset({ date, slot }); window.scrollTo(0, 0); },
           grade: (s, g, a) => { setSid(s); setCurrentGroup(g); setView('notes'); setFocusAct(a); window.scrollTo(0, 0); },
           notebook: (s, g) => { setSid(s); setCurrentGroup(g); go('notes'); },
+          groups: (s, g) => { setSid(s); setCurrentGroup(g); go('groups'); },
           go: (v) => go(v),
         }} />}
         {view === 'more' && (

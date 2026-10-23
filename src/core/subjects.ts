@@ -48,7 +48,8 @@ export function newSubject(id: string, name: string, course: string, kind: Subje
 
 /** Copia la estructura y la configuración de otra asignatura (sin su currículo ni sus grupos). */
 export function copyStructure(from: Subject, id: string, name: string, course: string): Subject {
-  return { ...structuredClone(from), id, name, course, updatedAt: Date.now() };
+  const { pd: _pd, reviews: _r, ...rest } = structuredClone(from);
+  return { ...rest, id, name, course, updatedAt: Date.now() };
 }
 
 // ---------- Currículo con IA ----------

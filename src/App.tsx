@@ -15,23 +15,24 @@ import { SchoolCalendar } from './ui/SchoolCalendar';
 import { NewSubject } from './ui/NewSubject';
 import { Today } from './ui/Today';
 import { Progress } from './ui/Progress';
+import { Programacion } from './ui/Programacion';
 import { Icon } from './ui/icons';
 import type { IconName } from './ui/icons';
 import { setCurrentGroup, useCurrentGroupId } from './ui/hooks';
 
-type View = 'hoy' | 'notes' | 'plan' | 'seg' | 'more' | 'att' | 'groups' | 'rep' | 'comm' | 'curr' | 'config' | 'cal' | 'conn' | 'new';
+type View = 'hoy' | 'notes' | 'plan' | 'seg' | 'more' | 'att' | 'groups' | 'rep' | 'comm' | 'curr' | 'config' | 'cal' | 'conn' | 'new' | 'pd';
 
 const MAIN: [View, string, IconName][] = [['hoy', 'Hoy', 'home'], ['notes', 'Cuaderno', 'grid'], ['plan', 'Planificar', 'cal']];
 const SECTIONS: { title: string; items: [View, string, string][] }[] = [
   { title: 'Alumnado', items: [['groups', 'Grupos y alumnos', 'Alumnado, NIA, importar de Classroom'], ['att', 'Asistencia', 'Pasar lista y resumen de faltas'], ['rep', 'Informes', 'Perfil competencial y boletines'], ['comm', 'Comunicación con el alumnado', 'Correos y avisos en el tablón de Classroom']] },
-  { title: 'Programación', items: [['seg', 'Seguimiento', 'Avance de las sesiones y resultados del grupo'], ['curr', 'Currículo', 'Competencias, criterios, objetivos y versiones'], ['config', 'Evaluación y configuración', 'Instrumentos, evaluaciones y cálculo'], ['cal', 'Calendario escolar', 'Festivos, evaluaciones y sesiones previstas'], ['new', 'Nueva asignatura', 'Plantilla LOMLOE, FP o copia']] },
+  { title: 'Programación', items: [['seg', 'Seguimiento', 'Avance, resultados e informe del docente'], ['pd', 'Programación didáctica', 'Documento para entregar a dirección'], ['curr', 'Currículo', 'Competencias, criterios, objetivos y versiones'], ['config', 'Evaluación y configuración', 'Instrumentos, evaluaciones y cálculo'], ['cal', 'Calendario escolar', 'Festivos, evaluaciones y sesiones previstas'], ['new', 'Nueva asignatura', 'Plantilla LOMLOE, FP o copia']] },
   { title: 'Datos', items: [['conn', 'Conexión y copias', 'Sincronización, Classroom y copia de seguridad']] },
 ];
-const TITLE: Record<View, string> = { hoy: 'Hoy', notes: 'Cuaderno', plan: 'Planificar', seg: 'Seguimiento', more: 'Más', att: 'Asistencia', groups: 'Grupos y alumnos', rep: 'Informes', comm: 'Comunicación', curr: 'Currículo', config: 'Evaluación y configuración', cal: 'Calendario escolar', conn: 'Conexión y copias', new: 'Nueva asignatura' };
+const TITLE: Record<View, string> = { hoy: 'Hoy', notes: 'Cuaderno', plan: 'Planificar', seg: 'Seguimiento', more: 'Más', att: 'Asistencia', groups: 'Grupos y alumnos', rep: 'Informes', comm: 'Comunicación', curr: 'Currículo', config: 'Evaluación y configuración', cal: 'Calendario escolar', conn: 'Conexión y copias', new: 'Nueva asignatura', pd: 'Programación didáctica' };
 /** Pantallas que trabajan sobre una asignatura y un grupo (llevan el selector arriba). */
-const WITH_CONTEXT = new Set<View>(['notes', 'plan', 'seg', 'att', 'groups', 'rep', 'comm', 'curr', 'config']);
+const WITH_CONTEXT = new Set<View>(['notes', 'plan', 'seg', 'att', 'groups', 'rep', 'comm', 'curr', 'config', 'pd']);
 /** Pantallas de la asignatura (no dependen del grupo). */
-const SUBJECT_ONLY = new Set<View>(['curr', 'config']);
+const SUBJECT_ONLY = new Set<View>(['curr', 'config', 'pd']);
 
 function SyncBar() {
   const st = useSyncStatus();
@@ -147,6 +148,7 @@ export function App() {
         {subject && view === 'groups' && <Groups key={subject.id} subject={subject} />}
         {subject && view === 'plan' && <Planner key={subject.id} subject={subject} onProgress={() => go('seg')} />}
         {subject && view === 'curr' && <Curriculum key={subject.id} subject={subject} />}
+        {subject && view === 'pd' && <Programacion key={subject.id} subject={subject} />}
         {subject && view === 'config' && <Config key={subject.id} subject={subject} />}
       </main>
 

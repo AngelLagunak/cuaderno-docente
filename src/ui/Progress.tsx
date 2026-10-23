@@ -7,6 +7,7 @@ import { parseHolidays, ymd } from '../core/planning';
 import type { Subject } from '../core/model';
 import { useCurrentGroupId, useGroups, useNodes, useSchoolCalendar } from './hooks';
 import { fmt, raw } from './cells';
+import { TeacherReport } from './TeacherReport';
 
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
 
@@ -17,7 +18,7 @@ export function Progress({ subject }: { subject: Subject }) {
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const nodes = useNodes(subject.id);
   const cal = useSchoolCalendar(group?.schoolYear);
-  const [tab, setTab] = useState<'plan' | 'res'>('plan');
+  const [tab, setTab] = useState<'plan' | 'res' | 'rep'>('plan');
   const [termId, setTermId] = useState(subject.terms[0]?.id ?? '');
   const today = ymd(new Date());
   const d = useLiveQuery(async () => {
@@ -55,10 +56,13 @@ export function Progress({ subject }: { subject: Subject }) {
 
   return (
     <div className="progress">
-      <div className="seg" role="group" aria-label="Vista">
+      <div className="seg noprint" role="group" aria-label="Vista">
         <button aria-pressed={tab === 'plan'} className={tab === 'plan' ? 'on' : ''} onClick={() => setTab('plan')}>Programación</button>
         <button aria-pressed={tab === 'res'} className={tab === 'res' ? 'on' : ''} onClick={() => setTab('res')}>Resultados</button>
+        <button aria-pressed={tab === 'rep'} className={tab === 'rep' ? 'on' : ''} onClick={() => setTab('rep')}>Informe del docente</button>
       </div>
+
+      {tab === 'rep' && <TeacherReport subject={subject} />}
 
       {tab === 'plan' && (
         <>

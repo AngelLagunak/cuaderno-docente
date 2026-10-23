@@ -141,7 +141,8 @@ h2.sec { margin:18px 0 6px; font-size:.78rem; font-weight:600; color:var(--mute)
 .li:last-child { border-bottom:0; }
 .li > span { display:flex; flex-direction:column; gap:2px; min-width:0; }
 .li svg { flex:none; color:var(--mute); }
-button.li:hover { background:var(--bg); }
+button.li:hover, a.li:hover { background:var(--bg); }
+a.li { text-decoration:none; }
 .dotted::before { content:''; display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--warn); margin-right:10px; vertical-align:middle; }
 .card.empty { display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
 .card.empty p { margin:0; }
@@ -254,3 +255,34 @@ details.sect > .inner { padding:12px 14px 14px; }
 button.chip { min-height:32px; padding:3px 12px; font-weight:500; }
 .setup .li:disabled { opacity:1; cursor:default; }
 .setup .li .done { color:var(--okink); }
+
+/* Programación didáctica e informe del docente */
+.pdHead { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:8px 12px; }
+.pd label, .trep label { display:flex; flex-direction:column; gap:4px; font-size:.86rem; color:var(--ink2); }
+.pd textarea, .trep textarea { width:100%; }
+.warnbox { border-left:4px solid var(--warn); }
+.okbox { border-left:4px solid var(--ok); }
+.warnbox ul, .okbox ul { margin:6px 0 0 18px; padding:0; }
+.pdDoc { line-height:1.45; overflow-x:auto; }
+.pdDoc h1 { font-size:1.35rem; margin:0 0 12px; }
+.pdDoc h2 { font-size:1.05rem; margin:22px 0 8px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+.pdDoc h3 { font-size:.95rem; margin:14px 0 4px; }
+.pdDoc table { border-collapse:collapse; width:100%; margin:8px 0; font-size:.86rem; }
+.pdDoc td, .pdDoc th { border:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; }
+.pdDoc th { background:var(--line2); }
+.pdDoc table.head th { width:28%; }
+.pdDoc ul { margin:2px 0 6px 18px; padding:0; }
+.pdDoc .small { font-size:.84rem; margin:2px 0; }
+.pdDoc .miss { color:var(--warn); }
+.trep .cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+.trep ul { margin:6px 0 0 18px; padding:0; }
+.trep li { margin:3px 0; }
+.trep .good li::marker { color:var(--ok); }
+.trep .bad li::marker { color:var(--warn); }
+@media print {
+  .pdDoc, .trep .card { box-shadow:none; padding:0; }
+  .pdDoc td, .pdDoc th { border-color:#999; }
+  .pdDoc h2 { break-after:avoid; }
+}
+.secrow { align-items:center; margin:18px 0 8px; }
+.secrow h2.sec { margin:0; }

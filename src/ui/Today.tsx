@@ -12,33 +12,55 @@ import { callScript } from '../data/api';
 import { configured } from '../data/sync';
 
 type ClsPending = { groupId: string; courseWorkId: string; title: string; turnedIn: number };
+type ClsMissing = { groupId: string; courseWorkId: string; title: string; dueDate: string; userIds: string[] };
+type ClsPost = { groupId: string; id: string; userId: string; text: string; time: string; link: string };
+type ClsComment = { id: string; subject: string; from: string; time: string; snippet: string; unread: boolean; link: string };
+interface ClsInfo { at: number; pending: ClsPending[]; missing: ClsMissing[]; posts: ClsPost[]; comments: ClsComment[]; errors: string[] }
+const EMPTY: ClsInfo = { at: 0, pending: [], missing: [], posts: [], comments: [], errors: [] };
+
 /**
- * Entregas de Classroom sin calificar en los grupos vinculados (necesita conexión y el Apps Script actualizado).
+ * Lo que llega de Classroom en los grupos vinculados: entregas sin calificar, tareas sin entregar, publicaciones del
+ * alumnado en el tablón y comentarios (avisos por correo). Necesita conexión y el Apps Script actualizado.
  * Se guarda 15 minutos para no consultar en cada visita.
  */
-function useClassroomPending(): ClsPending[] {
-  const [list, setList] = useState<ClsPending[]>(() => { try { const c = JSON.parse(sessionStorage.getItem('clsPending') || 'null'); return c && Date.now() - c.at < 15 * 60_000 ? c.list : []; } catch { return []; } });
+function useClassroom(): [ClsInfo, boolean, () => void] {
+  const read = (): ClsInfo => { try { const c = JSON.parse(sessionStorage.getItem('clsInfo') || 'null'); return c && Date.now() - c.at < 15 * 60_000 ? c : EMPTY; } catch { return EMPTY; } };
+  const [info, setInfo] = useState<ClsInfo>(read);
+  const [busy, setBusy] = useState(false);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     let done = false;
     (async () => {
-      try { const c = JSON.parse(sessionStorage.getItem('clsPending') || 'null'); if (c && Date.now() - c.at < 15 * 60_000) return; } catch { /* sin almacenamiento */ }
+      if (tick === 0 && read().at) return;
       if (!configured() || !navigator.onLine) return;
       const groups = (await db.groups.toArray()).filter((g) => !g.deleted && g.classroomCourseId);
-      const out: ClsPending[] = [];
+      if (!groups.length) return;
+      setBusy(true);
+      const out: ClsInfo = { ...EMPTY, at: Date.now(), errors: [] };
       for (const g of groups) {
+        const courseId = g.classroomCourseId;
         try {
-          const r = await callScript<{ courseWorkId: string; title: string; turnedIn: number }[]>('classroom.pending', { courseId: g.classroomCourseId });
-          out.push(...r.map((x) => ({ ...x, groupId: g.id })));
-        } catch { /* Apps Script sin actualizar o sin conexión: no se muestra */ }
+          const r = await callScript<{ courseWorkId: string; title: string; turnedIn: number }[]>('classroom.pending', { courseId });
+          out.pending.push(...r.map((x) => ({ ...x, groupId: g.id })));
+        } catch { /* sin conexión: no se muestra */ }
+        try {
+          const r = await callScript<{ missing: Omit<ClsMissing, 'groupId'>[]; posts: Omit<ClsPost, 'groupId'>[] }>('classroom.alerts', { courseId, days: 14 });
+          out.missing.push(...r.missing.map((x) => ({ ...x, groupId: g.id })));
+          out.posts.push(...r.posts.map((x) => ({ ...x, groupId: g.id })));
+        } catch (e) { out.errors.push(`${g.name}: ${String((e as Error).message ?? e)}`); }
       }
+      try { out.comments = await callScript<ClsComment[]>('classroom.comments', { days: 14 }); }
+      catch (e) { out.errors.push(`Comentarios: ${String((e as Error).message ?? e)}`); }
       if (done) return;
-      setList(out);
-      try { sessionStorage.setItem('clsPending', JSON.stringify({ at: Date.now(), list: out })); } catch { /* sin almacenamiento */ }
-    })();
+      setInfo(out); setBusy(false);
+      try { sessionStorage.setItem('clsInfo', JSON.stringify(out)); } catch { /* sin almacenamiento */ }
+    })().catch(() => setBusy(false));
     return () => { done = true; };
-  }, []);
-  return list;
+  }, [tick]);
+  return [info, busy, () => setTick((t) => t + 1)];
 }
+
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 
 const DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -65,7 +87,8 @@ export function Today({ nav }: { nav: TodayNav }) {
   const hhmm = () => new Date().toTimeString().slice(0, 5);
   const [clock, setClock] = useState(hhmm);
   useEffect(() => { const t = setInterval(() => setClock(hhmm()), 30_000); return () => clearInterval(t); }, []);
-  const pendingCls = useClassroomPending();
+  const [cls, clsBusy, clsRefresh] = useClassroom();
+  const pendingCls = cls.pending;
   const [hideSetup, setHideSetup] = useState(() => { try { return localStorage.getItem('setupHidden') === '1'; } catch { return false; } });
   const data = useLiveQuery(async () => {
     const [subjects, groups, sessions, attendance, units, activities, students] = await Promise.all([
@@ -198,6 +221,9 @@ export function Today({ nav }: { nav: TodayNav }) {
         </div>
       ) : <p className="mute">Nada pendiente: las actividades con fecha pasada tienen todas sus notas.</p>}
 
+      <ClassroomAlerts info={cls} busy={clsBusy} refresh={clsRefresh} groups={live} students={data.students} activities={data.activities}
+        open={(g, a) => (a ? nav.grade(g.subjectId, g.id, a) : nav.notebook(g.subjectId, g.id))} />
+
       {warns.length > 0 && (
         <>
           <h2 className="sec">Avisos</h2>
@@ -252,5 +278,73 @@ function ClassCard(p: { c: DayClass; date: string; today: string; subject: strin
         </button>
       )}
     </section>
+  );
+}
+
+/** Avisos de Classroom: tareas sin entregar, publicaciones del alumnado y comentarios. */
+function ClassroomAlerts(p: {
+  info: ClsInfo; busy: boolean; refresh: () => void; groups: import('../core/model').Group[]; students: import('../core/model').Student[];
+  activities: import('../core/model').Activity[]; open: (g: import('../core/model').Group, activityId?: string) => void;
+}) {
+  const { info } = p;
+  if (!p.groups.some((g) => g.classroomCourseId)) return null;
+  const who = (g: import('../core/model').Group, uid: string) => {
+    const s = p.students.find((x) => !x.deleted && x.groupId === g.id && x.classroomUserId === uid);
+    return s ? `${s.firstName} ${s.lastName}` : 'alumno sin enlazar';
+  };
+  const missing = [...info.missing].sort((a, b) => b.dueDate.localeCompare(a.dueDate));
+  const nothing = !missing.length && !info.posts.length && !info.comments.length;
+  return (
+    <>
+      <div className="sp secrow"><h2 className="sec">Classroom</h2><button className="small" disabled={p.busy} onClick={p.refresh}>{p.busy ? 'Consultando…' : 'Actualizar'}</button></div>
+      {nothing && <p className="mute">{info.at ? 'Sin tareas sin entregar ni comentarios nuevos (últimos 14 días).' : configured() ? 'Pulsa Actualizar para consultar Classroom.' : 'Conecta el Apps Script en Conexión y copias para ver entregas y comentarios.'}</p>}
+      {missing.length > 0 && (
+        <details className="card sect" open={missing.length <= 3}>
+          <summary>Sin entregar · {missing.reduce((n, m) => n + m.userIds.length, 0)} entregas en {missing.length} tarea{missing.length === 1 ? '' : 's'}</summary>
+          <div className="list">
+            {missing.map((m) => {
+              const g = p.groups.find((x) => x.id === m.groupId)!;
+              const a = p.activities.find((x) => !x.deleted && x.classroomWorkId === m.courseWorkId);
+              return (
+                <button key={m.groupId + m.courseWorkId} className="li" onClick={() => p.open(g, a?.id)}>
+                  <span><b>{a?.title ?? m.title}</b><span className="mute">{g.name}{m.dueDate ? ` · fecha ${m.dueDate.split('-').reverse().join('/')}` : ''} · {m.userIds.length} sin entregar: {m.userIds.map((u) => who(g, u)).join(', ')}</span></span>
+                  <Icon name="chev" size={18} />
+                </button>
+              );
+            })}
+          </div>
+        </details>
+      )}
+      {info.comments.length > 0 && (
+        <details className="card sect" open>
+          <summary>Comentarios · {info.comments.filter((c) => c.unread).length} sin leer</summary>
+          <div className="list">
+            {info.comments.map((c) => (
+              <a key={c.id} className="li" href={c.link} target="_blank" rel="noreferrer">
+                <span><b className={c.unread ? '' : 'mute'}>{c.subject}</b><span className="mute">{shortDate(c.time)} · {c.snippet.slice(0, 140)}</span></span>
+                <Icon name="chev" size={18} />
+              </a>
+            ))}
+          </div>
+        </details>
+      )}
+      {info.posts.length > 0 && (
+        <details className="card sect" open>
+          <summary>Publicaciones del alumnado en el tablón · {info.posts.length}</summary>
+          <div className="list">
+            {info.posts.map((x) => {
+              const g = p.groups.find((y) => y.id === x.groupId)!;
+              return (
+                <a key={x.id} className="li" href={x.link} target="_blank" rel="noreferrer">
+                  <span><b>{who(g, x.userId)} · {g.name}</b><span className="mute">{shortDate(x.time)} · {x.text.slice(0, 140)}</span></span>
+                  <Icon name="chev" size={18} />
+                </a>
+              );
+            })}
+          </div>
+        </details>
+      )}
+      {info.errors.length > 0 && <p className="mute" style={{ fontSize: ".84rem" }}>No se pudo consultar: {info.errors.join(' · ')}. Revisa que el Apps Script esté actualizado y autorizado.</p>}
+    </>
   );
 }

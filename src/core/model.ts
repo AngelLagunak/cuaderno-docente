@@ -79,6 +79,20 @@ export interface Subject extends Stamp {
   instruments: Instrument[];
   terms: Term[];
   config: SubjectConfig;
+  /** Programación didáctica: cabecera y textos de los apartados que no salen de los datos. */
+  pd?: PdInfo;
+  /** Reflexión del docente en su informe de cada evaluación (clave: id de la evaluación o «final»). */
+  reviews?: Record<string, string>;
+}
+
+/** Datos de la programación didáctica que no salen del cuaderno: cabecera y textos de cada apartado. */
+export interface PdInfo {
+  centre?: string;
+  department?: string;
+  teacher?: string;
+  year?: string;
+  norm?: string;
+  texts?: Record<string, string>;
 }
 
 export interface CNode extends Stamp {

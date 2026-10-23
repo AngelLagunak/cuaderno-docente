@@ -27,6 +27,12 @@ function doPost(e) {
       case 'classroom.pending':
         out = { ok: true, data: pending_(req.courseId) };
         break;
+      case 'classroom.alerts':
+        out = { ok: true, data: alerts_(req.courseId, req.days || 14) };
+        break;
+      case 'classroom.comments':
+        out = { ok: true, data: comments_(req.days || 14) };
+        break;
       case 'classroom.work.create':
         out = { ok: true, data: workCreate_(req) };
         break;
@@ -119,6 +125,62 @@ function pending_(courseId) {
   var titles = {};
   workList_(courseId).forEach(function (w) { titles[w.id] = w.title; });
   return ids.map(function (id) { return { courseWorkId: id, title: titles[id] || '', turnedIn: by[id] }; });
+}
+
+/**
+ * Avisos de un curso: tareas con fecha pasada que el alumnado no ha entregado (Classroom las marca «late») y
+ * publicaciones del alumnado en el tablón de los últimos `days` días. La API no da los comentarios: ver comments_.
+ */
+function alerts_(courseId, days) {
+  var cid = enc_(courseId);
+  var work = {};
+  workList_(courseId).forEach(function (w) { work[w.id] = w; });
+  var subs = all_('/v1/courses/' + cid + '/courseWork/-/studentSubmissions?late=LATE_ONLY&pageSize=100', 'studentSubmissions');
+  var by = {};
+  subs.forEach(function (s) {
+    if (s.state === 'TURNED_IN' || s.state === 'RETURNED') return;
+    var w = work[s.courseWorkId];
+    if (!w || w.state !== 'PUBLISHED') return;
+    (by[s.courseWorkId] = by[s.courseWorkId] || []).push(s.userId);
+  });
+  var missing = Object.keys(by).map(function (id) {
+    return { courseWorkId: id, title: work[id].title, dueDate: work[id].dueDate, userIds: by[id] };
+  });
+  var teachers = {};
+  all_('/v1/courses/' + cid + '/teachers?pageSize=30', 'teachers').forEach(function (t) { teachers[t.userId] = true; });
+  var since = new Date(Date.now() - days * 86400000).toISOString();
+  var ann = api_('/v1/courses/' + cid + '/announcements?pageSize=40&orderBy=updateTime%20desc').announcements || [];
+  var posts = ann.filter(function (a) { return !teachers[a.creatorUserId] && a.updateTime >= since; }).map(function (a) {
+    return { id: a.id, userId: a.creatorUserId, text: String(a.text || '').slice(0, 300), time: a.updateTime, link: a.alternateLink || '' };
+  });
+  return { missing: missing, posts: posts };
+}
+
+/**
+ * Comentarios en tareas y en el tablón: la API de Classroom no los da, así que se leen los avisos que Classroom
+ * manda por correo (hay que tener activadas las notificaciones por correo en Classroom).
+ */
+function comments_(days) {
+  var q = 'from:(classroom.google.com) newer_than:' + days + 'd';
+  var list = gmail_('/messages?maxResults=40&q=' + encodeURIComponent(q)).messages || [];
+  var me = Session.getEffectiveUser().getEmail();
+  return list.map(function (m) {
+    var j = gmail_('/messages/' + m.id + '?format=metadata&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=From');
+    var h = {};
+    ((j.payload && j.payload.headers) || []).forEach(function (x) { h[x.name] = x.value; });
+    return {
+      id: m.id, subject: h.Subject || '', from: h.From || '', time: new Date(Number(j.internalDate)).toISOString(),
+      snippet: j.snippet || '', unread: (j.labelIds || []).indexOf('UNREAD') >= 0,
+      link: 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.threadId
+    };
+  }).filter(function (x) { return /coment|comment|respon|repl|mencion|mention/i.test(x.subject + ' ' + x.snippet); });
+}
+
+function gmail_(path) {
+  var res = UrlFetchApp.fetch('https://gmail.googleapis.com/gmail/v1/users/me' + path, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
+  var j = JSON.parse(res.getContentText() || '{}');
+  if (res.getResponseCode() >= 300) throw new Error('Gmail ' + res.getResponseCode() + ': ' + ((j.error && j.error.message) || ''));
+  return j;
 }
 
 function rubricGrades_(s) {
@@ -306,4 +368,5 @@ function autorizar() {
   Logger.log(JSON.stringify(courses_()));
   Logger.log('Cuota de correo: ' + MailApp.getRemainingDailyQuota());
   Logger.log('Archivo de datos: ' + dbFile_().getUrl());
+  Logger.log('Avisos de Classroom por correo: ' + comments_(14).length);
 }

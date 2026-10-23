@@ -145,7 +145,7 @@ export function Attendance({ subject, preset }: { subject: Subject; preset?: { d
             <label>Hora <input className="num" style={{ width: 60 }} value={slot} onChange={(e) => setSlot(e.target.value.trim() || '1')} /></label>
             {!sessionHeld && <button className="on" onClick={markAll}>Todos presentes</button>}
             {sessionHeld && <button className="small" onClick={delSession}>Borrar sesión</button>}
-            <label><input type="checkbox" style={{ width: 'auto' }} checked={showObs} onChange={(e) => setShowObs(e.target.checked)} /> Observaciones</label>
+            <label><input type="checkbox" checked={showObs} onChange={(e) => setShowObs(e.target.checked)} /> Observaciones</label>
           </div>
           <SessionNotes groupId={group.id} date={date} slot={slot} />
           {cardsOn && (() => {

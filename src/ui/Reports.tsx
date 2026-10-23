@@ -244,7 +244,7 @@ export function Reports({ subject }: { subject: Subject }) {
           <div>
             <div className="row noprint">
               {!gTerms && periodSel}{axisSel}
-              <label><input type="checkbox" style={{ width: 'auto' }} checked={gTerms} onChange={(e) => setGTerms(e.target.checked)} /> Comparar evaluaciones</label>
+              <label><input type="checkbox" checked={gTerms} onChange={(e) => setGTerms(e.target.checked)} /> Comparar evaluaciones</label>
             </div>
             <div className="card">
               <b>{group.name}</b> · {fv.length} de {students.length} alumnos con nota final

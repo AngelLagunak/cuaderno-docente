@@ -101,7 +101,7 @@ export function Config({ subject }: { subject: Subject }) {
             {d.levels.map((l) => <option key={l.key} value={l.key}>Media de {l.plural.toLowerCase()} (los instrumentos ponderan las medidas de cada criterio)</option>)}
           </select>
         </label>
-        <label><input type="checkbox" style={{ width: 'auto' }} checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Avisar si alguna parte ({d.config.gradeLevel ? d.levels.find((l) => l.key === d.config.gradeLevel)?.plural.toLowerCase() : 'instrumentos'}) no llega al aprobado</label>
+        <label><input type="checkbox" checked={d.config.minPerInstrument} onChange={(e) => cfg({ minPerInstrument: e.target.checked })} /> Avisar si alguna parte ({d.config.gradeLevel ? d.levels.find((l) => l.key === d.config.gradeLevel)?.plural.toLowerCase() : 'instrumentos'}) no llega al aprobado</label>
         <label>Penalización por entrega tardía (%) <input className="num" type="number" min={0} max={100} value={d.config.latePenaltyPct} onChange={(e) => cfg({ latePenaltyPct: num(e.target.value) })} /></label>
         <label>Aviso de faltas injustificadas (%) <input className="num" type="number" min={0} max={100} value={d.config.absenceWarnPct ?? 20} onChange={(e) => cfg({ absenceWarnPct: num(e.target.value, 20) })} /></label>
         <label>Escala de la nota final
@@ -110,7 +110,7 @@ export function Config({ subject }: { subject: Subject }) {
             <option value="ssapntsb">Numérica + SS / AP / NT / SB</option>
           </select>
         </label>
-        <label><input type="checkbox" style={{ width: 'auto' }} checked={!!d.config.lateNoImprove} onChange={(e) => cfg({ lateNoImprove: e.target.checked })} /> Una entrega fuera de plazo sin justificar no se puede recuperar</label>
+        <label><input type="checkbox" checked={!!d.config.lateNoImprove} onChange={(e) => cfg({ lateNoImprove: e.target.checked })} /> Una entrega fuera de plazo sin justificar no se puede recuperar</label>
         <label>Pérdida de evaluación continua: carpeta % <input className="num" type="number" min={0} max={100} value={d.config.lec?.folderPct ?? 50} onChange={(e) => cfg({ lec: { folderPct: num(e.target.value), examPct: d.config.lec?.examPct ?? 50 } })} /></label>
         <label>Pérdida de evaluación continua: examen global % <input className="num" type="number" min={0} max={100} value={d.config.lec?.examPct ?? 50} onChange={(e) => cfg({ lec: { folderPct: d.config.lec?.folderPct ?? 50, examPct: num(e.target.value) } })} /></label>
         <label>Extraordinaria: proyectos % <input className="num" type="number" min={0} max={100} value={d.config.extra?.projectsPct ?? 40} onChange={(e) => cfg({ extra: { ...(d.config.extra ?? { projectsPct: 40, examPct: 60, minEach: 0 }), projectsPct: num(e.target.value) } })} /></label>
@@ -145,7 +145,7 @@ export function Config({ subject }: { subject: Subject }) {
             <input value={l.label} onChange={(e) => updLevel(i, { label: e.target.value })} />
             <input value={l.plural} onChange={(e) => updLevel(i, { plural: e.target.value })} />
             <div className="row" style={{ margin: 0 }}>
-              <label><input type="checkbox" style={{ width: 'auto' }} checked={!!l.graded} onChange={(e) => updLevel(i, { graded: e.target.checked })} /> Evaluable</label>
+              <label><input type="checkbox" checked={!!l.graded} onChange={(e) => updLevel(i, { graded: e.target.checked })} /> Evaluable</label>
               <button className="small" onClick={() => delLevel(l.key)}>Quitar</button>
             </div>
           </div>
@@ -156,9 +156,9 @@ export function Config({ subject }: { subject: Subject }) {
         {d.relations.map((r, i) => (
           <div className="form" key={r.key} style={{ borderBottom: '1px solid var(--line)', paddingBottom: 8 }}>
             <b>{lbl(r.from)} → {lbl(r.to)}</b>
-            <label><input type="checkbox" style={{ width: 'auto' }} checked={!!r.aggregate} onChange={(e) => updRel(i, { aggregate: e.target.checked })} /> El valor sube a {lbl(r.to).toLowerCase()} (radar)</label>
-            <label><input type="checkbox" style={{ width: 'auto' }} checked={!!r.needFrom} onChange={(e) => updRel(i, { needFrom: e.target.checked })} /> Avisar si {lbl(r.from).toLowerCase()} sin enlace</label>
-            <label><input type="checkbox" style={{ width: 'auto' }} checked={!!r.needTo} onChange={(e) => updRel(i, { needTo: e.target.checked })} /> Avisar si {lbl(r.to).toLowerCase()} sin enlace</label>
+            <label><input type="checkbox" checked={!!r.aggregate} onChange={(e) => updRel(i, { aggregate: e.target.checked })} /> El valor sube a {lbl(r.to).toLowerCase()} (radar)</label>
+            <label><input type="checkbox" checked={!!r.needFrom} onChange={(e) => updRel(i, { needFrom: e.target.checked })} /> Avisar si {lbl(r.from).toLowerCase()} sin enlace</label>
+            <label><input type="checkbox" checked={!!r.needTo} onChange={(e) => updRel(i, { needTo: e.target.checked })} /> Avisar si {lbl(r.to).toLowerCase()} sin enlace</label>
             <button className="small" onClick={() => set({ relations: d.relations.filter((_, j) => j !== i) })}>Quitar relación</button>
           </div>
         ))}

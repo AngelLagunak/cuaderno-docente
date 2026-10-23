@@ -12,7 +12,7 @@
     "https://www.googleapis.com/auth/classroom.coursework.students",
     "https://www.googleapis.com/auth/classroom.announcements",
     "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://mail.google.com/",
     "https://www.googleapis.com/auth/script.scriptapp"
   ]
 }

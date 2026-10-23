@@ -15,7 +15,7 @@ function SyncPanel() {
     <div className="card">
       <b>Sincronización y copias en Drive</b>
       <p className="mute">Los datos se guardan en este dispositivo y se sincronizan con un archivo de tu Drive. Gana el cambio más reciente de cada registro.</p>
-      <label><input type="checkbox" style={{ width: 'auto' }} checked={auto} onChange={(e) => { setAuto(e.target.checked); localStorage.setItem('syncAuto', e.target.checked ? '1' : '0'); }} /> Sincronizar automáticamente (cada minuto, al volver la conexión y al salir)</label>
+      <label><input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); localStorage.setItem('syncAuto', e.target.checked ? '1' : '0'); }} /> Sincronizar automáticamente (cada minuto, al volver la conexión y al salir)</label>
       <div className="row">
         <button className="on" onClick={() => syncNow()} disabled={st.state === 'syncing'}>Sincronizar ahora</button>
         <button onClick={async () => { setMsg('Copiando…'); try { const r = await callScript<{ name: string; kept: number }>('backup.run'); setMsg(`Copia ${r.name} (${r.kept} guardadas)`); } catch (e) { setMsg('Error: ' + (e as Error).message); } }}>Copia en Drive ahora</button>

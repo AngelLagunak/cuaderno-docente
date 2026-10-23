@@ -80,7 +80,7 @@ export function FinalView(p: { subject: Subject; students: Student[]; acts: Acti
         {pecRows.map(({ s, o, ab }) => (
           <div key={s.id} className="issue" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ flex: 1, minWidth: 140 }}>{s.lastName}, {s.firstName} <span className={ab.warn ? 'warn' : 'mute'}>{Math.round(ab.pct)} %</span></span>
-            <label><input type="checkbox" style={{ width: 'auto' }} checked={!!s.lec} onChange={() => togglePec(s, ab.pct)} /> PEC</label>
+            <label><input type="checkbox" checked={!!s.lec} onChange={() => togglePec(s, ab.pct)} /> PEC</label>
             {s.lec && (
               <>
                 <label>Carpeta <Cell value={s.lecGrades?.folder} stamp={s.updatedAt} label="Carpeta" onSave={(v) => saveStudent(s, { lecGrades: { folder: v, exam: s.lecGrades?.exam ?? null } })} /></label>

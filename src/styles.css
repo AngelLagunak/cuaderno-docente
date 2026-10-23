@@ -31,8 +31,8 @@ button.on { background:var(--brand); color:var(--card); border-color:var(--brand
 .chip button { border:0; background:none; padding:0 4px; min-height:0; color:var(--mute); }
 .chip.add { padding:3px 10px; color:var(--brand); }
 .picker { border:1px solid var(--line); border-radius:8px; margin-top:6px; max-height:260px; overflow:auto; padding:6px; }
-.picker label { display:flex; gap:8px; padding:5px 2px; font-size:.88rem; align-items:flex-start; }
-.picker input[type=checkbox] { width:auto; margin-top:3px; }
+.picker label { display:flex; gap:10px; padding:6px 4px; font-size:.88rem; align-items:center; }
+.picker label > span { flex:1; min-width:0; }
 .issue { display:flex; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); font-size:.9rem; }
 .issue b { min-width: 64px; }
 .warn { color:var(--warn); }
@@ -239,6 +239,7 @@ h2.h2 { margin:0 0 10px; font-size:1rem; }
 
 /* ---------- Formularios: nada se sale de la pantalla en el móvil ---------- */
 input, select, textarea { max-width:100%; }
+input[type=checkbox], input[type=radio] { width:18px; height:18px; min-height:0; padding:0; margin:0; flex:none; accent-color:var(--brand); vertical-align:middle; }
 label { overflow-wrap:anywhere; }
 .grid2 > * { min-width:0; width:100%; }
 .grid2 { grid-template-columns:minmax(0, 1fr) 76px 40px; }

@@ -117,7 +117,7 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
         <option value="">Sin rúbrica (nota numérica)</option>
         {p.rubrics.map((r) => <option key={r.id} value={r.id}>Rúbrica: {r.name}</option>)}
       </select>
-      <label><input type="checkbox" style={{ width: 'auto' }} checked={!!a.fromObs} onChange={(e) => setA({ ...a, fromObs: e.target.checked || undefined })} /> Nota desde las observaciones del aula (participación, material… marcadas en Asistencia)</label>
+      <label><input type="checkbox" checked={!!a.fromObs} onChange={(e) => setA({ ...a, fromObs: e.target.checked || undefined })} /> Nota desde las observaciones del aula (participación, material… marcadas en Asistencia)</label>
       <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
       {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
       {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}

@@ -348,7 +348,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
           <b>{act.title}</b>
           <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}{rubricOf(act) ? ` · rúbrica «${rubricOf(act)!.name}»` : ''}</div>
           {actItems(act).length > 0 ? (
-            <label className="row"><input type="checkbox" style={{ width: 'auto' }} checked={items} onChange={(e) => setItems(e.target.checked)} /> Calificar por criterio ({actItems(act).length})</label>
+            <label className="row"><input type="checkbox" checked={items} onChange={(e) => setItems(e.target.checked)} /> Calificar por criterio ({actItems(act).length})</label>
           ) : (
             <p className="mute warn">Esta actividad no tiene criterios: solo admite nota global y no aporta al perfil competencial. Añádelos en el Planificador.</p>
           )}

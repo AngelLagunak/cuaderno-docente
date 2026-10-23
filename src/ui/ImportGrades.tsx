@@ -73,7 +73,7 @@ export function ImportGrades(p: { subject: Subject; students: Student[]; acts: A
           <p>
             {fresh.length} notas nuevas · {differ.length} distintas a las de la app{res.invalid ? ` · ${res.invalid} celdas no válidas (se ignoran)` : ''}.
           </p>
-          {differ.length > 0 && <label><input type="checkbox" style={{ width: 'auto' }} checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} /> Sobrescribir también las {differ.length} distintas</label>}
+          {differ.length > 0 && <label><input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} /> Sobrescribir también las {differ.length} distintas</label>}
         </>
       )}
       <div className="row">

@@ -14,7 +14,7 @@ export function TimetableGrid({ value, onChange }: { value: TT; onChange: (tt: T
         <tbody>
           {['1', '2', '3', '4', '5', '6', '7'].map((h) => (
             <tr key={h}><td>{h}.ª</td>{DAYS.map((_, i) => (
-              <td key={i}><input type="checkbox" aria-label={`${DAYS[i]} ${h}.ª hora`} style={{ width: 'auto' }} checked={has(i + 1, h)} onChange={() => toggle(i + 1, h)} /></td>
+              <td key={i}><input type="checkbox" aria-label={`${DAYS[i]} ${h}.ª hora`} checked={has(i + 1, h)} onChange={() => toggle(i + 1, h)} /></td>
             ))}</tr>
           ))}
         </tbody>

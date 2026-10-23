@@ -161,26 +161,18 @@ function alerts_(courseId, days) {
  * manda por correo (hay que tener activadas las notificaciones por correo en Classroom).
  */
 function comments_(days) {
-  var q = 'from:(classroom.google.com) newer_than:' + days + 'd';
-  var list = gmail_('/messages?maxResults=40&q=' + encodeURIComponent(q)).messages || [];
-  var me = Session.getEffectiveUser().getEmail();
-  return list.map(function (m) {
-    var j = gmail_('/messages/' + m.id + '?format=metadata&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=From');
-    var h = {};
-    ((j.payload && j.payload.headers) || []).forEach(function (x) { h[x.name] = x.value; });
-    return {
-      id: m.id, subject: h.Subject || '', from: h.From || '', time: new Date(Number(j.internalDate)).toISOString(),
-      snippet: j.snippet || '', unread: (j.labelIds || []).indexOf('UNREAD') >= 0,
-      link: 'https://mail.google.com/mail/?authuser=' + encodeURIComponent(me) + '#all/' + m.threadId
-    };
-  }).filter(function (x) { return /coment|comment|respon|repl|mencion|mention/i.test(x.subject + ' ' + x.snippet); });
-}
-
-function gmail_(path) {
-  var res = UrlFetchApp.fetch('https://gmail.googleapis.com/gmail/v1/users/me' + path, { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
-  var j = JSON.parse(res.getContentText() || '{}');
-  if (res.getResponseCode() >= 300) throw new Error('Gmail ' + res.getResponseCode() + ': ' + ((j.error && j.error.message) || ''));
-  return j;
+  // GmailApp (servicio propio de Apps Script): no hace falta activar la API de Gmail en Google Cloud.
+  var threads = GmailApp.search('from:(classroom.google.com) newer_than:' + days + 'd', 0, 40);
+  var out = [];
+  threads.forEach(function (t) {
+    var m = t.getMessages().pop();
+    var body = m.getPlainBody().replace(/\s+/g, ' ').trim();
+    out.push({
+      id: m.getId(), subject: m.getSubject() || '', from: m.getFrom() || '', time: m.getDate().toISOString(),
+      snippet: body.slice(0, 200), unread: t.isUnread(), link: t.getPermalink()
+    });
+  });
+  return out.filter(function (x) { return /coment|comment|respon|repl|mencion|mention/i.test(x.subject + ' ' + x.snippet); });
 }
 
 function rubricGrades_(s) {
@@ -368,5 +360,6 @@ function autorizar() {
   Logger.log(JSON.stringify(courses_()));
   Logger.log('Cuota de correo: ' + MailApp.getRemainingDailyQuota());
   Logger.log('Archivo de datos: ' + dbFile_().getUrl());
-  Logger.log('Avisos de Classroom por correo: ' + comments_(14).length);
+  try { Logger.log('Avisos de Classroom por correo: ' + comments_(14).length); }
+  catch (e) { Logger.log('Correo no disponible (los comentarios no se mostrarán): ' + e.message); }
 }

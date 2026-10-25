@@ -71,7 +71,7 @@ export interface TodayNav {
   attendance: (subjectId: string, groupId: string, date: string, slot: string) => void;
   grade: (subjectId: string, groupId: string, activityId: string) => void;
   notebook: (subjectId: string, groupId: string) => void;
-  go: (view: 'groups' | 'conn' | 'cal' | 'plan') => void;
+  go: (view: 'groups' | 'conn' | 'cal' | 'plan' | 'new') => void;
   groups: (subjectId: string, groupId: string) => void;
 }
 
@@ -104,6 +104,17 @@ export function Today({ nav }: { nav: TodayNav }) {
   const subjectOf = (id: string) => subjects.find((s) => s.id === id);
   const live = groups.filter((g) => subjectOf(g.subjectId));
 
+  if (!subjects.length) return (
+    <div className="card empty">
+      <b>Bienvenida al cuaderno</b>
+      <p className="mute">Empieza creando tu primera asignatura: parte de la plantilla LOMLOE, la de FP o una vacía, y carga su currículo con la ayuda de una IA. Después crea sus grupos.</p>
+      <div className="row center">
+        <button className="on" onClick={() => nav.go('new')}>Crear una asignatura</button>
+        <button onClick={() => nav.go('conn')}>Conectar con Drive</button>
+      </div>
+      <p className="mute">¿Ya usas la app en otro dispositivo? Conecta con Drive y tus datos llegarán solos.</p>
+    </div>
+  );
   if (!live.length) return (
     <div className="card empty">
       <b>Aún no hay grupos</b>

@@ -40,12 +40,29 @@ export async function applyRemote(pull: Record<string, Rec[]>) {
   return n;
 }
 
+/**
+ * Lo precargado por versiones antiguas (updatedAt 0) nunca se sube al servidor. Se marca una vez por dispositivo,
+ * después de recibir lo remoto, para que llegue a Drive y a los demás dispositivos.
+ */
+async function adoptPreloaded() {
+  if (localStorage.getItem('preloadAdopted')) return 0;
+  const now = Date.now();
+  let n = 0;
+  for (const t of TABLES) {
+    const rows = await tab(t).filter((r) => !r.updatedAt).toArray();
+    if (rows.length) { await tab(t).bulkPut(rows.map((r) => ({ ...r, updatedAt: now }))); n += rows.length; }
+  }
+  localStorage.setItem('preloadAdopted', '1');
+  return n;
+}
+
 let running = false;
 export async function syncNow() {
   if (running) return;
   if (!configured()) { set({ state: 'off', msg: 'Configura la conexión' }); return; }
   if (!navigator.onLine) { set({ state: 'offline' }); return; }
   running = true;
+  let again = false;
   set({ state: 'syncing' });
   try {
     const startedAt = Date.now();
@@ -77,12 +94,14 @@ export async function syncNow() {
     }
     localStorage.setItem('syncSince', String(version));
     localStorage.setItem('syncPushAt', String(startedAt));
+    again = (await adoptPreloaded()) > 0;
     set({ state: 'ok', last: Date.now(), pending: await pendingCount(), msg: `${pushed} enviados, ${pulled} recibidos` });
   } catch (e) {
     set({ state: 'error', msg: (e as Error).message, pending: await pendingCount().catch(() => 0) });
   } finally {
     running = false;
   }
+  if (again) await syncNow();
 }
 
 /** Elimina del dispositivo los borrados de hace más de 60 días que ya se enviaron al servidor. */

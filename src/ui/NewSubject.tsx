@@ -29,14 +29,14 @@ export function NewSubject({ subjects, onDone }: { subjects: Subject[]; onDone: 
       <select value={kind} onChange={(e) => setKind(e.target.value as Subject['kind'])}>
         {KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
-      <label><input type="radio" style={{ width: 'auto' }} checked={tpl === 'lomloe'} onChange={() => setTpl('lomloe')} /> LOMLOE: competencias específicas, criterios, descriptores y saberes (nota = media de las competencias)</label>
-      <label><input type="radio" style={{ width: 'auto' }} checked={tpl === 'fp'} onChange={() => setTpl('fp')} /> FP: resultados de aprendizaje y criterios de evaluación</label>
+      <label><input type="radio" checked={tpl === 'lomloe'} onChange={() => setTpl('lomloe')} /> LOMLOE: competencias específicas, criterios, descriptores y saberes (nota = media de las competencias)</label>
+      <label><input type="radio" checked={tpl === 'fp'} onChange={() => setTpl('fp')} /> FP: resultados de aprendizaje y criterios de evaluación</label>
       {subjects.length > 0 && (
-        <label><input type="radio" style={{ width: 'auto' }} checked={tpl === 'copy'} onChange={() => setTpl('copy')} /> Copiar instrumentos, evaluaciones y cálculo de
+        <label><input type="radio" checked={tpl === 'copy'} onChange={() => setTpl('copy')} /> Copiar instrumentos, evaluaciones y cálculo de
           {' '}<select value={from} onChange={(e) => { setFrom(e.target.value); setTpl('copy'); }}>{subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
         </label>
       )}
-      <label><input type="radio" style={{ width: 'auto' }} checked={tpl === 'empty'} onChange={() => setTpl('empty')} /> Vacía (la estructura se define en Configuración)</label>
+      <label><input type="radio" checked={tpl === 'empty'} onChange={() => setTpl('empty')} /> Vacía (la estructura se define en Configuración)</label>
       <p className="mute">Después: carga el currículo en Currículo → «Cargar con IA», revisa instrumentos y evaluaciones en Configuración y crea los grupos.</p>
       <div className="row">
         <button className="on" disabled={!name.trim()} onClick={create}>Crear</button>

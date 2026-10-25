@@ -111,7 +111,14 @@ export function App() {
           <h1>{TITLE[view]}</h1>
           <SyncBar />
         </header>
-        {context && <div className="row noprint">{context}</div>}
+        {context && subjects.length > 0 && <div className="row noprint">{context}</div>}
+        {subjects?.length === 0 && WITH_CONTEXT.has(view) && (
+          <div className="card empty">
+            <b>Aún no hay asignaturas</b>
+            <p className="mute">Crea la primera para empezar a trabajar en esta pantalla.</p>
+            <button className="on" onClick={() => go('new')}>Crear una asignatura</button>
+          </div>
+        )}
 
         {view === 'hoy' && <Today nav={{
           attendance: (s, g, date, slot) => { setSid(s); setCurrentGroup(g); setView('att'); setAttPreset({ date, slot }); window.scrollTo(0, 0); },

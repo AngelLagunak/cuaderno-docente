@@ -49,7 +49,10 @@ class DB extends Dexie {
 
 export const db = new DB();
 
-/** Carga los catálogos la primera vez. No sobrescribe materias ya existentes. */
+/**
+ * Migraciones de las materias guardadas. Las instalaciones nuevas empiezan sin asignaturas; los catálogos solo
+ * actualizan las materias que ya los usaban.
+ */
 export async function seed() {
   for (const s of await db.subjects.toArray()) {
     const cat = catalogs.find((c) => c.subject.id === s.id);
@@ -67,14 +70,6 @@ export async function seed() {
       const upd = refreshedCatalogNodes(await db.nodes.where('subjectId').equals(s.id).toArray(), cat.nodes);
       if (upd.length) await db.nodes.bulkPut(upd);
     }
-  }
-  for (const c of catalogs) {
-    if (await db.subjects.get(c.subject.id)) continue;
-    await db.transaction('rw', db.subjects, db.nodes, db.links, async () => {
-      await db.subjects.put(c.subject);
-      await db.nodes.bulkPut(c.nodes);
-      await db.links.bulkPut(c.links);
-    });
   }
 }
 

@@ -46,7 +46,7 @@ export interface ToGrade { activity: Activity; missing: number; total: number }
 export function toGrade(activities: Activity[], students: Student[], grades: Grade[], today: string): ToGrade[] {
   const graded = new Set(grades.filter((g) => !g.deleted && g.value != null).map((g) => `${g.studentId}|${g.activityId}`));
   return activities
-    .filter((a) => !a.deleted && a.date && a.date <= today)
+    .filter((a) => !a.deleted && !a.formative && a.date && a.date <= today)
     .map((a) => {
       const st = students.filter((s) => !s.deleted && s.groupId === a.groupId);
       return { activity: a, total: st.length, missing: st.filter((s) => !graded.has(`${s.id}|${a.id}`)).length };

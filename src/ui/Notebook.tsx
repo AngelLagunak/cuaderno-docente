@@ -28,6 +28,16 @@ function ActCell({ sg, s, a }: { sg: StudentGrades; s: Student; a: Activity }) {
   return <><Cell value={g?.value} stamp={g?.updatedAt} label={`${s.lastName} · ${a.title}`} onSave={(v) => saveGrade(s.id, a.id, { value: v })} /><RecMark g={g} /></>;
 }
 
+/** Nombre en la tabla: completo; en el móvil, primer apellido y nombre para que quepan las notas. */
+function StudentName({ s }: { s: Student }) {
+  return <><span className="nmFull">{s.lastName}, {s.firstName}</span><span className="nmShort">{s.lastName.split(/\s+/)[0]}, {s.firstName.split(/\s+/)[0]}</span></>;
+}
+
+/** Casilla de una actividad sin calificación: muestra si hay comentario y abre al alumno. */
+function CommentMark({ g, onOpen }: { g?: Grade; onOpen: () => void }) {
+  return <button className="linkish" title={g?.comment || 'Sin comentario'} onClick={onOpen}>{g?.comment ? '💬' : '—'}</button>;
+}
+
 /** Nota de un criterio: botones de nivel si la rúbrica de la actividad tiene fila para él; si no, casilla numérica. */
 function ItemRow({ s, a, node, g, rubric, onRecover }: { s: Student; a: Activity; node: CNode; g?: Grade; rubric?: Rubric; onRecover: () => void }) {
   const row = rubric?.rows.find((r) => r.nodeId === node.id);
@@ -230,7 +240,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
   const termKey = view === 'final' ? 'final' : term?.id;
   const termVals = students.map((s) => termResult(subject, acts, sgOf(s), term.id, curr).value);
   const withVal = termVals.filter((v): v is number => v != null);
-  const missing = students.reduce((n, s) => n + termActs.filter((a) => activityBase(a, sgOf(s)) == null).length, 0);
+  const missing = students.reduce((n, s) => n + termActs.filter((a) => !a.formative && activityBase(a, sgOf(s)) == null).length, 0);
   const openAct = (a: Activity, s?: Student) => { setActId(a.id); setView('act'); setMode('one'); if (s) setStuIdx(students.findIndex((x) => x.id === s.id)); window.scrollTo(0, 0); };
   const menu: [string, () => void, boolean?][] = [
     ...(group.classroomCourseId && linked > 0 ? [['Traer notas de Classroom', () => pullAll(), busy] as [string, () => void, boolean]] : []),
@@ -294,7 +304,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
                 {students.map((s, i) => (
                   <tr key={s.id} className={i === stuIdx ? 'sel' : ''}>
                     <td><button className="linkish" onClick={() => setStuIdx(i)}>{s.lastName}, {s.firstName}</button></td>
-                    <td>{fmt(activityBase(act, sgOf(s)), 2)}</td>
+                    <td>{act.formative ? (sgOf(s).byActivity.get(act.id)?.comment ? '💬' : '—') : fmt(activityBase(act, sgOf(s)), 2)}</td>
                     <td className="sum">{fmt(round(termResult(subject, acts, sgOf(s), act.termId, curr).value, cfg.termDecimals), cfg.termDecimals)}</td>
                   </tr>
                 ))}
@@ -302,7 +312,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
             </table>
           </div>
           <StudentGrader subject={subject} act={act} acts={acts} student={stu} sg={sgOf(stu)} items={actItems(act)} rubric={rubricOf(act)} curr={curr}
-            pos={`${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · ${actItems(act).filter((n) => sgOf(stu).byItem.get(act.id)?.get(n.id)?.value != null).length} de ${actItems(act).length} criterios`}
+            pos={act.formative ? `${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · sin calificación` : `${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · ${actItems(act).filter((n) => sgOf(stu).byItem.get(act.id)?.get(n.id)?.value != null).length} de ${actItems(act).length} criterios`}
             onPrev={() => setStuIdx((stuIdx - 1 + students.length) % students.length)} onNext={() => setStuIdx((stuIdx + 1) % students.length)} />
         </div>
       )}
@@ -313,7 +323,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
             <thead>
               <tr>
                 <th>Alumno</th>
-                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}><button className="linkish" title="Calificar esta actividad" onClick={() => openAct(a)}>{a.title}</button><div className="mute">{instName(a.instrumentId).slice(0, 10)}</div>{gl && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
+                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}><button className="linkish" title="Calificar esta actividad" onClick={() => openAct(a)}>{a.title}</button><div className="mute">{a.formative ? 'sin nota' : instName(a.instrumentId).slice(0, 10)}</div>{gl && !a.formative && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
                 {partsHead.map((p) => <th key={p.id} className="sum" title={p.title}>{p.name}</th>)}
                 <th className="sum">{term.name}</th>
               </tr>
@@ -323,8 +333,8 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
                 const r = termResult(subject, acts, sgOf(s), term.id, curr);
                 return (
                   <tr key={s.id}>
-                    <td>{s.lastName}, {s.firstName}</td>
-                    {termActs.map((a) => <td key={a.id}><ActCell sg={sgOf(s)} s={s} a={a} /><LateBtn s={s} a={a} /></td>)}
+                    <td title={`${s.lastName}, ${s.firstName}`}><StudentName s={s} /></td>
+                    {termActs.map((a) => <td key={a.id}>{a.formative ? <CommentMark g={sgOf(s).byActivity.get(a.id)} onOpen={() => openAct(a, s)} /> : <><ActCell sg={sgOf(s)} s={s} a={a} /><LateBtn s={s} a={a} /></>}</td>)}
                     {r.parts.map((i) => <td key={i.id} className={'sum' + (cfg.minPerInstrument && i.value != null && i.value < cfg.passMark ? ' warn' : '')}>{fmt(round(i.value, cfg.termDecimals), cfg.termDecimals)}</td>)}
                     <td className="sum" title={r.coverage < 1 ? `Provisional: ${Math.round(r.coverage * 100)} % de ${partLabel} con datos` : ''}>
                       {fmt(round(r.value, cfg.termDecimals), cfg.termDecimals)}{r.coverage < 1 && r.value != null ? '*' : ''}
@@ -334,7 +344,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
               })}
               <tr>
                 <td className="mute">Media</td>
-                {termActs.map((a) => <td key={a.id} className="mute">{fmt(round(wmean(students.map((s): [Num, number] => [activityValue(a, sgOf(s), subject), 1])), 1), 1)}</td>)}
+                {termActs.map((a) => <td key={a.id} className="mute">{a.formative ? '' : fmt(round(wmean(students.map((s): [Num, number] => [activityValue(a, sgOf(s), subject), 1])), 1), 1)}</td>)}
                 <td colSpan={partsHead.length + 1} />
               </tr>
             </tbody>
@@ -347,7 +357,9 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
         <div className="card">
           <b>{act.title}</b>
           <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}{rubricOf(act) ? ` · rúbrica «${rubricOf(act)!.name}»` : ''}</div>
-          {actItems(act).length > 0 ? (
+          {act.formative ? (
+            <p className="mute">Actividad sin calificación: no cuenta en la nota. Escribe un comentario si quieres dejar constancia (opcional).</p>
+          ) : actItems(act).length > 0 ? (
             <label className="row"><input type="checkbox" checked={items} onChange={(e) => setItems(e.target.checked)} /> Calificar por criterio ({actItems(act).length})</label>
           ) : (
             <p className="mute warn">Esta actividad no tiene criterios: solo admite nota global y no aporta al perfil competencial. Añádelos en el Planificador.</p>
@@ -367,13 +379,13 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
               <div key={s.id}>
                 <div className="issue sp" style={{ alignItems: 'center' }}>
                   <span style={{ flex: 1 }}>{s.lastName}, {s.firstName}</span>
-                  <input className="cell" style={{ width: 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
+                  <input className="cell" style={{ width: act.formative ? 220 : 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
                     onBlur={(e) => e.target.value !== (g?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />
-                  <span><ActCell sg={sgOf(s)} s={s} a={act} /><LateBtn s={s} a={act} /></span>
-                  <span className="row" style={{ margin: 0, gap: 4 }}>
+                  {!act.formative && <span><ActCell sg={sgOf(s)} s={s} a={act} /><LateBtn s={s} a={act} /></span>}
+                  {!act.formative && <span className="row" style={{ margin: 0, gap: 4 }}>
                     {itemGrades(act, sgOf(s)).length === 0 && g?.value != null && <button className="small" title="Registrar recuperación (se guarda la nota anterior)" onClick={() => recover(s, act)}>Rec.</button>}
                     <button className="small" title="Entrega vacía o archivo corrupto: 0" onClick={() => emptyDelivery(s, act)}>∅</button>
-                  </span>
+                  </span>}
                 </div>
                 {its.length > 0 && (
                   <div className="items">

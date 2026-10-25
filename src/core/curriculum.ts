@@ -78,7 +78,17 @@ export const gradedLevels = (subject: Subject) => new Set(subject.levels.filter(
 export function activitiesWithoutItems(subject: Subject, nodes: CNode[], activities: Activity[]): Activity[] {
   const graded = gradedLevels(subject);
   const ok = new Set(nodes.filter((n) => !n.deleted && graded.has(n.level)).map((n) => n.id));
-  return activities.filter((a) => !a.deleted && !a.nodeIds.some((id) => ok.has(id)));
+  return activities.filter((a) => !a.deleted && !a.formative && !a.nodeIds.some((id) => ok.has(id)));
+}
+
+/**
+ * Elementos de una unidad: sus saberes (los elige el docente) y los criterios de las actividades que pertenecen a
+ * ella, calificables o no. Los criterios que se guardaron antes directamente en la unidad también cuentan.
+ */
+export function unitNodeIds(u: LearningUnit, activities: Activity[]): string[] {
+  const ids = new Set(u.nodeIds);
+  for (const a of activities) if (!a.deleted && a.unitId === u.id) a.nodeIds.forEach((id) => ids.add(id));
+  return [...ids];
 }
 
 export interface CoverageRow {
@@ -101,8 +111,8 @@ export function coverage(subject: Subject, nodes: CNode[], links: CLink[], units
     for (const id of ids) for (const p of ancestors(id)) s.add(p);
     return s;
   };
-  const ur = units.filter((u) => !u.deleted).map((u) => reach(u.nodeIds));
-  const ar = activities.filter((a) => !a.deleted).map((a) => ({ a, r: reach(a.nodeIds) }));
+  const ur = units.filter((u) => !u.deleted).map((u) => reach(unitNodeIds(u, activities)));
+  const ar = activities.filter((a) => !a.deleted && !a.formative).map((a) => ({ a, r: reach(a.nodeIds) }));
   return nodes
     .filter((n) => !n.deleted && graded.has(n.level))
     .map((node) => {

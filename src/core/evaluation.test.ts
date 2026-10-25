@@ -298,3 +298,12 @@ describe('nota por competencias específicas (Proyectos Artísticos, normativa L
     expect(termResult(PA, [a, b], grades([[a, 8], [b, 2]]), 't1', C).value).toBe(8);
   });
 });
+
+describe('actividades sin calificación', () => {
+  it('no cuentan en la nota de la evaluación ni en el perfil', () => {
+    const a = act({ nodeIds: [crit('1.1')] }), f = act({ nodeIds: [crit('1.1')], formative: true });
+    const g = grades([[a, 6], [f, 10]]);
+    expect(termResult(PAI, [a, f], g, 't1', C).value).toBe(6);
+    expect(profile(PA, C.nodes, C.links, [a, f], g).nodes.get(crit('1.1'))).toBe(6);
+  });
+});

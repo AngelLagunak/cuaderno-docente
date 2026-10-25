@@ -1,4 +1,4 @@
-import { coverage, gradedLevels } from './curriculum';
+import { coverage, gradedLevels, unitNodeIds } from './curriculum';
 import { aggregateTree } from './evaluation';
 import type { Activity, CLink, CNode, LearningUnit, PdInfo, Rubric, Session, Subject } from './model';
 
@@ -120,7 +120,7 @@ function sectionB(d: PdData): string {
   if (saberes.length) out += `<h3>Saberes básicos</h3><table>${saberes.map((n) => `<tr><td>${esc(n.code)}</td><td>${esc(n.title)}</td></tr>`).join('')}</table>`;
   if (!units.length) return out + '<p class="miss">Faltan las unidades didácticas (Planificar).</p>';
   const ordered = [...units].sort((a, b) => s.terms.findIndex((t) => t.id === a.termId) - s.terms.findIndex((t) => t.id === b.termId) || a.code.localeCompare(b.code, 'es', { numeric: true }));
-  const codes = (u: LearningUnit, f: (n: CNode) => boolean) => u.nodeIds.map((id) => byId.get(id)).filter((n): n is CNode => !!n && f(n)).sort(byOrder).map((n) => esc(n.code)).join(', ') || '—';
+  const codes = (u: LearningUnit, f: (n: CNode) => boolean) => unitNodeIds(u, d.activities).map((id) => byId.get(id)).filter((n): n is CNode => !!n && f(n)).sort(byOrder).map((n) => esc(n.code)).join(', ') || '—';
   const dates = (u: LearningUnit) => {
     const ss = d.sessions.filter((x) => !x.deleted && x.unitId === u.id).map((x) => x.date).sort();
     return ss.length ? `${dmy(ss[0])} – ${dmy(ss[ss.length - 1])}` : '—';
@@ -139,13 +139,15 @@ function sectionC(d: PdData): string {
   const top = cov.filter((r) => r.node.level === critLevel(s));
   const rows = s.instruments.map((i) => {
     const crit = top.filter((r) => r.byInstrument[i.id]).map((r) => esc(r.node.code));
-    const n = acts.filter((a) => a.instrumentId === i.id).length;
+    const n = acts.filter((a) => a.instrumentId === i.id && !a.formative).length;
     return `<tr><td>${esc(i.name)}</td><td>${pct(i.weight, total)}</td><td>${crit.join(', ') || '—'}</td><td>${n || '—'}</td></tr>`;
   }).join('');
   let out = `<table><tr><th>Instrumento</th><th>Peso</th><th>Criterios que evalúa</th><th>Actividades</th></tr>${rows}</table>`;
   const rub = d.rubrics.filter((r) => !r.deleted);
   if (rub.length) out += `<p><b>Rúbricas:</b> ${rub.map((r) => `${esc(r.name)} (${r.levels.map((l) => esc(l.label)).join(' / ')})`).join('; ')}.</p>`;
   const obs = s.config.observations ?? [];
+  const form = acts.filter((a) => a.formative).length;
+  if (form) out += `<p><b>Evaluación formativa sin calificación:</b> ${form} actividad${form === 1 ? '' : 'es'} con retroalimentación oral o escrita al alumnado, que no cuenta${form === 1 ? '' : 'n'} en la nota.</p>`;
   if (obs.length && acts.some((a) => a.fromObs)) out += `<p><b>Observación sistemática en el aula</b> al pasar lista: ${obs.map((o) => `${esc(o.label)} (${o.sign > 0 ? '+' : '−'})`).join(', ')}.</p>`;
   const noCrit = top.filter((r) => r.total === 0);
   if (noCrit.length && acts.length) out += `<p class="miss">Criterios aún sin actividad de evaluación: ${noCrit.map((r) => esc(r.node.code)).join(', ')}.</p>`;
@@ -193,14 +195,15 @@ export function pdIssues(d: PdData, info: PdInfo): string[] {
   if (!units.length) out.push('Faltan las unidades didácticas (Planificar).');
   else {
     const { ancestors } = aggregateTree(s, links);
-    const inUnits = new Set(units.flatMap((u) => u.nodeIds.flatMap((id) => [id, ...ancestors(id)])));
+    const unitIds = (u: LearningUnit) => unitNodeIds(u, d.activities);
+    const inUnits = new Set(units.flatMap((u) => unitIds(u).flatMap((id) => [id, ...ancestors(id)])));
     const crit = nodes.filter((n) => n.level === critLevel(s));
     const out1 = crit.filter((n) => !inUnits.has(n.id));
-    if (out1.length) out.push(`Criterios en ninguna unidad: ${out1.map((n) => n.code).slice(0, 10).join(', ')}${out1.length > 10 ? '…' : '.'}`);
+    if (out1.length) out.push(`Criterios que no trabaja ninguna actividad de las unidades: ${out1.map((n) => n.code).slice(0, 10).join(', ')}${out1.length > 10 ? '…' : '.'}`);
     const sab = nodes.filter((n) => n.level === 'saber' && !inUnits.has(n.id));
     if (sab.length) out.push(`Saberes en ninguna unidad: ${sab.map((n) => n.code).slice(0, 10).join(', ')}${sab.length > 10 ? '…' : '.'}`);
-    const empty = units.filter((u) => !u.nodeIds.some((id) => graded.has(nodes.find((n) => n.id === id)?.level ?? '')));
-    if (empty.length) out.push(`Unidades sin criterios: ${empty.map((u) => u.code).join(', ')}.`);
+    const empty = units.filter((u) => !unitIds(u).some((id) => graded.has(nodes.find((n) => n.id === id)?.level ?? '')));
+    if (empty.length) out.push(`Unidades sin actividades con criterios: ${empty.map((u) => u.code).join(', ')}.`);
     if (d.planned) s.terms.forEach((t, i) => {
       const need = units.filter((u) => u.termId === t.id).reduce((n, u) => n + u.plannedSessions, 0);
       const have = d.planned![i];

@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import type { CNode, Subject } from '../core/model';
 
-export function NodePicker(p: { subject: Subject; nodes: CNode[]; selected: string[]; onChange: (ids: string[]) => void }) {
-  const [lv, setLv] = useState(p.subject.levels.find((l) => l.graded)?.key ?? p.subject.levels[0]?.key ?? '');
+/** Elegir elementos del currículo. `levels` limita los niveles que se pueden elegir (p. ej. solo saberes). */
+export function NodePicker(p: { subject: Subject; nodes: CNode[]; selected: string[]; onChange: (ids: string[]) => void; levels?: string[] }) {
+  const levels = p.subject.levels.filter((l) => !p.levels || p.levels.includes(l.key));
+  const [lv, setLv] = useState(levels.find((l) => l.graded)?.key ?? levels[0]?.key ?? '');
   const [q, setQ] = useState('');
   const byId = new Map(p.nodes.map((n) => [n.id, n]));
   const list = p.nodes.filter((n) => n.level === lv && (!q || (n.code + ' ' + n.title).toLowerCase().includes(q.toLowerCase())));
@@ -15,9 +17,11 @@ export function NodePicker(p: { subject: Subject; nodes: CNode[]; selected: stri
         ))}
       </div>
       <div className="row">
-        <select value={lv} onChange={(e) => setLv(e.target.value)}>
-          {p.subject.levels.map((l) => <option key={l.key} value={l.key}>{l.plural}</option>)}
-        </select>
+        {levels.length > 1 && (
+          <select value={lv} onChange={(e) => setLv(e.target.value)}>
+            {levels.map((l) => <option key={l.key} value={l.key}>{l.plural}</option>)}
+          </select>
+        )}
         <input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="picker">

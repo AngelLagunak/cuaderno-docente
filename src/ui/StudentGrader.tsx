@@ -32,7 +32,9 @@ export function StudentGrader(p: {
         <button aria-label="Alumno siguiente" onClick={p.onNext}><Icon name="right" /></button>
       </div>
 
-      {p.items.length === 0 ? (
+      {act.formative ? (
+        <p className="ink2">Actividad sin calificación: no cuenta en la nota ni en las competencias. Si quieres, deja constancia del comentario que le has dado.</p>
+      ) : p.items.length === 0 ? (
         <div className="crit">
           <span className="ink2">Nota de la actividad (no tiene criterios: no cuenta en las competencias)</span>
           <Cell value={overall?.value} stamp={overall?.updatedAt} label={`${s.lastName} · ${act.title}`} onSave={(v) => saveGrade(s.id, act.id, { value: v })} />
@@ -60,7 +62,7 @@ export function StudentGrader(p: {
         );
       })}
 
-      <div className="cascade" aria-live="polite">
+      {!act.formative && <div className="cascade" aria-live="polite">
         <div className="sp"><b>Se calcula solo</b><span>{subject.config.gradeLevel ? 'criterios → competencias → evaluación' : 'actividades → instrumentos → evaluación'}</span></div>
         <div className="parts">
           {r.parts.map((x) => (
@@ -71,7 +73,7 @@ export function StudentGrader(p: {
           ))}
         </div>
         <div className="sp total"><span>{term?.name} de {s.firstName}</span><b>{fmt(r.value, subject.config.termDecimals)}</b></div>
-      </div>
+      </div>}
 
       <textarea rows={2} placeholder={`Comentario para ${s.firstName}`} defaultValue={overall?.comment ?? ''} key={'c' + s.id + (overall?.updatedAt ?? 0)}
         onBlur={(e) => e.target.value !== (overall?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />

@@ -7,12 +7,22 @@ import { Rubrics } from './Rubrics';
 import { Calendar } from './Calendar';
 import { callScript } from '../data/api';
 import type { CWork } from '../data/api';
-import { activitiesWithoutItems, coverage } from '../core/curriculum';
+import { activitiesWithoutItems, coverage, gradedLevels, unitNodeIds } from '../core/curriculum';
 import type { Activity, CNode, Group, LearningUnit, Rubric, Subject } from '../core/model';
 
+/** Niveles de contenidos (saberes básicos): no se evalúan ni tienen relaciones; se eligen en cada unidad. */
+const contentLevelsOf = (s: Subject) => s.levels.filter((l) => !l.graded && !s.relations.some((r) => r.from === l.key || r.to === l.key));
+
+/**
+ * Unidad didáctica: sus saberes se eligen aquí; sus criterios salen solos de las actividades que pertenecen a ella
+ * (y de ahí, en cascada, competencias específicas y descriptores).
+ */
 function UnitForm(p: { subject: Subject; nodes: CNode[]; init: LearningUnit; onDone: () => void }) {
   const [u, setU] = useState(p.init);
   const [pick, setPick] = useState(false);
+  const content = contentLevelsOf(p.subject).map((l) => l.key);
+  const byId = new Map(p.nodes.map((n) => [n.id, n]));
+  const saberes = u.nodeIds.filter((id) => content.includes(byId.get(id)?.level ?? ''));
   return (
     <div className="card form">
       <input placeholder="Código (UD1)" value={u.code} onChange={(e) => setU({ ...u, code: e.target.value })} />
@@ -23,8 +33,9 @@ function UnitForm(p: { subject: Subject; nodes: CNode[]; init: LearningUnit; onD
         </select>
         <label>Sesiones <input className="num" type="number" min={0} value={u.plannedSessions} onChange={(e) => setU({ ...u, plannedSessions: Number(e.target.value) || 0 })} /></label>
       </div>
-      <button className="small" onClick={() => setPick(!pick)}>Elementos curriculares ({u.nodeIds.length})</button>
-      {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={u.nodeIds} onChange={(ids) => setU({ ...u, nodeIds: ids })} />}
+      {content.length > 0 && <button className="small" onClick={() => setPick(!pick)}>{contentLevelsOf(p.subject).map((l) => l.plural).join(', ')} de la unidad ({saberes.length})</button>}
+      {pick && <NodePicker subject={p.subject} nodes={p.nodes} levels={content} selected={saberes} onChange={(ids) => setU({ ...u, nodeIds: ids })} />}
+      <p className="mute">Los criterios de evaluación de la unidad salen de sus actividades: al crear una actividad, elige esta unidad y sus criterios.</p>
       <div className="row">
         <button className="on" disabled={!u.code.trim() || !u.title.trim()} onClick={async () => { await db.units.put({ ...u, updatedAt: Date.now() }); p.onDone(); }}>Guardar</button>
         <button onClick={p.onDone}>Cancelar</button>
@@ -117,7 +128,8 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
         <option value="">Sin rúbrica (nota numérica)</option>
         {p.rubrics.map((r) => <option key={r.id} value={r.id}>Rúbrica: {r.name}</option>)}
       </select>
-      <label><input type="checkbox" checked={!!a.fromObs} onChange={(e) => setA({ ...a, fromObs: e.target.checked || undefined })} /> Nota desde las observaciones del aula (participación, material… marcadas en Asistencia)</label>
+      <label><input type="checkbox" checked={!!a.formative} onChange={(e) => setA({ ...a, formative: e.target.checked || undefined, fromObs: e.target.checked ? undefined : a.fromObs })} /> Sin calificación (evaluación formativa: solo comentario al alumno; no cuenta en la nota ni avisa de notas pendientes)</label>
+      {!a.formative && <label><input type="checkbox" checked={!!a.fromObs} onChange={(e) => setA({ ...a, fromObs: e.target.checked || undefined })} /> Nota desde las observaciones del aula (participación, material… marcadas en Asistencia)</label>}
       <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
       {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
       {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}
@@ -218,7 +230,9 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
   const cov = coverage(subject, nodes, lkRaw ?? [], units, acts);
   const noItems = new Set(activitiesWithoutItems(subject, nodes, acts).map((a) => a.id));
   // Contenidos (saberes básicos): niveles no evaluables sin relaciones; se reparten en las unidades.
-  const contentLevels = subject.levels.filter((l) => !l.graded && !subject.relations.some((r) => r.from === l.key || r.to === l.key));
+  const contentLevels = contentLevelsOf(subject);
+  const gradedLv = gradedLevels(subject);
+  const unitCrit = (u: LearningUnit) => unitNodeIds(u, actsRaw ?? []).map((id) => byId.get(id)).filter((n): n is CNode => !!n && gradedLv.has(n.level)).sort((a, b) => a.order - b.order);
   const contents = nodes.filter((n) => contentLevels.some((l) => l.key === n.level));
   const inUnits = (id: string) => units.filter((u) => u.nodeIds.includes(id));
 
@@ -246,7 +260,11 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
           <div className="card sp" key={u.id}>
             <div>
               <b>{u.code}</b> {u.title}
-              <div className="mute">{subject.terms.find((t) => t.id === u.termId)?.name} · {u.plannedSessions} sesiones · {u.nodeIds.length} elementos</div>
+              <div className="mute">{subject.terms.find((t) => t.id === u.termId)?.name} · {u.plannedSessions} sesiones{contentLevels.length ? ` · ${u.nodeIds.filter((id) => contentLevels.some((l) => l.key === byId.get(id)?.level)).length} saberes` : ''}</div>
+              <div className="chips">
+                {unitCrit(u).map((n) => <span className="chip" key={n.id} title={n.title}>{n.code}</span>)}
+                {!unitCrit(u).length && <span className="mute">Sin criterios: salen de las actividades de la unidad.</span>}
+              </div>
             </div>
             <div className="row" style={{ margin: 0 }}>
               <button className="small" onClick={() => setEu(u)}>Editar</button>
@@ -282,7 +300,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}{a.formative ? ' · sin calificación' : ''}
                         </div>
                         {noItems.has(a.id) && <div className="warn mute">⚠ Sin criterio</div>}
                         <div className="chips">
@@ -305,7 +323,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
       {contents.length > 0 && (
         <details className="card">
           <summary>{contentLevels.map((l) => l.plural).join(', ')} en las unidades ({contents.filter((n) => !inUnits(n.id).length).length} sin unidad)</summary>
-          <p className="mute">Los saberes definen los contenidos: se incluyen en las unidades didácticas (Elementos curriculares de cada unidad), no se evalúan.</p>
+          <p className="mute">Los saberes definen los contenidos: se eligen en cada unidad didáctica y no se evalúan.</p>
           {contents.map((n) => {
             const us = inUnits(n.id);
             return (

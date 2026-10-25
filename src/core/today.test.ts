@@ -41,4 +41,7 @@ describe('por corregir', () => {
       [st('a'), st('b'), st('c'), st('z', 'otro')], [gr('a', 'cartel', 7), gr('b', 'cartel', null), gr('a', 'fanzine', 5, 'n1'), gr('b', 'fanzine', 6), gr('c', 'fanzine', 8)], '2026-10-21');
     expect(r.map((x) => [x.activity.id, x.missing, x.total])).toEqual([['cartel', 2, 3]]);
   });
+  it('las actividades sin calificación nunca quedan por corregir', () => {
+    expect(toGrade([{ ...act('debate', '2026-10-19'), formative: true }], [st('a')], [], '2026-10-21')).toEqual([]);
+  });
 });

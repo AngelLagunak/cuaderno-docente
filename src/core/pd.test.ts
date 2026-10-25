@@ -29,8 +29,19 @@ describe('programación didáctica', () => {
     const i1 = pdIssues(base({ units, planned: [30, 30, 30] }), { centre: 'EA', teacher: 'Yo', year: '2026/27', texts });
     expect(i1.filter((x) => !x.startsWith('Saberes'))).toEqual([]);
     const i2 = pdIssues(base({ units: units.slice(0, 1), planned: [5, 30, 30] }), { centre: 'EA', teacher: 'Yo', year: '2026/27', texts });
-    expect(i2).toContain('Criterios en ninguna unidad: 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4.');
+    expect(i2).toContain('Criterios que no trabaja ninguna actividad de las unidades: 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 5.4.');
     expect(i2).toContain('1.ª evaluación: las unidades piden 10 sesiones y solo hay 5 lectivas.');
+  });
+  it('los criterios de cada unidad salen de sus actividades; la unidad solo elige saberes', () => {
+    const saber = pa.nodes.find((n) => n.level === 'saber')!;
+    const u = unit('u1', 'UD1', [saber.id]);
+    const act = { id: 'a1', subjectId: pa.subject.id, groupId: 'g', termId: 't1', instrumentId: 'proy', title: 'A', weight: 1, nodeIds: ['pa-1bach/crit:1.1'], unitId: 'u1', formative: true, updatedAt: 0 };
+    const html = pdHtml(base({ units: [u], activities: [act] }), {});
+    expect(html).toMatch(/<td><b>UD1<\/b>.*<td>1\.1<\/td><td>[^<]*<\/td><\/tr>/);
+    expect(html).toContain('Evaluación formativa sin calificación');
+    const iss = pdIssues(base({ units: [u], activities: [act] }), {});
+    expect(iss.some((x) => x.startsWith('Unidades sin actividades con criterios'))).toBe(false);
+    expect(pdIssues(base({ units: [u] }), {})).toContain('Unidades sin actividades con criterios: UD1.');
   });
   it('apartado d): describe el cálculo real de la nota', () => {
     const t = gradingText(pa.subject).join(' ');

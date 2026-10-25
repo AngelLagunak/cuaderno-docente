@@ -88,6 +88,10 @@ export function Today({ nav }: { nav: TodayNav }) {
   const [clock, setClock] = useState(hhmm);
   useEffect(() => { const t = setInterval(() => setClock(hhmm()), 30_000); return () => clearInterval(t); }, []);
   const [cls, clsBusy, clsRefresh] = useClassroom();
+  // Filtro de grupo para lo que hay por corregir y los avisos de Classroom (se recuerda en el dispositivo).
+  const [fgSaved, setFg] = useState(() => { try { return localStorage.getItem('todayGroup') ?? ''; } catch { return ''; } });
+  const [allPend, setAllPend] = useState(false);
+  const pickGroup = (id: string) => { setFg(id); setAllPend(false); try { localStorage.setItem('todayGroup', id); } catch { /* sin almacenamiento */ } };
   const pendingCls = cls.pending;
   const [hideSetup, setHideSetup] = useState(() => { try { return localStorage.getItem('setupHidden') === '1'; } catch { return false; } });
   const data = useLiveQuery(async () => {
@@ -142,7 +146,13 @@ export function Today({ nav }: { nav: TodayNav }) {
   const moveDay = (n: number) => { setDate(addDays(date, n)); setPick(null); };
 
   // Por corregir
-  const pending = toGrade(data.activities.filter((a) => subjectOf(a.subjectId)), data.students, data.grades, today).slice(0, 4);
+  const fg = live.some((g) => g.id === fgSaved) ? fgSaved : '';
+  const inG = (gid: string) => !fg || gid === fg;
+  const pendingAll = toGrade(data.activities.filter((a) => subjectOf(a.subjectId)), data.students, data.grades, today);
+  const countOf = (gid: string) => pendingAll.filter((p) => p.activity.groupId === gid).length + cls.pending.filter((x) => x.groupId === gid).length + cls.missing.filter((x) => x.groupId === gid).length;
+  const pendingF = pendingAll.filter((p) => inG(p.activity.groupId));
+  const pending = allPend ? pendingF : pendingF.slice(0, 5);
+  const pendingClsF = pendingCls.filter((x) => inG(x.groupId));
 
   // Avisos
   const warns: { text: string; go?: () => void }[] = [];
@@ -207,9 +217,18 @@ export function Today({ nav }: { nav: TodayNav }) {
 
       </div><div>
       <h2 className="sec">Por corregir</h2>
-      {pendingCls.length > 0 && (
+      {live.length > 1 && (
+        <div className="pills" role="group" aria-label="Filtrar por grupo">
+          <button className={!fg ? 'on' : ''} aria-pressed={!fg} onClick={() => pickGroup('')}>Todos</button>
+          {live.map((g) => {
+            const n = countOf(g.id);
+            return <button key={g.id} className={fg === g.id ? 'on' : ''} aria-pressed={fg === g.id} onClick={() => pickGroup(g.id)}>{g.name}{n ? ` · ${n}` : ''}</button>;
+          })}
+        </div>
+      )}
+      {pendingClsF.length > 0 && (
         <div className="card list">
-          {pendingCls.map((x) => {
+          {pendingClsF.map((x) => {
             const g = live.find((y) => y.id === x.groupId);
             const a = data.activities.find((y) => !y.deleted && y.classroomWorkId === x.courseWorkId);
             return (
@@ -229,10 +248,11 @@ export function Today({ nav }: { nav: TodayNav }) {
               <Icon name="chev" size={18} />
             </button>
           ))}
+          {pendingF.length > 5 && <button className="li more" onClick={() => setAllPend(!allPend)}><span className="mute">{allPend ? 'Ver menos' : `Ver las ${pendingF.length}`}</span></button>}
         </div>
-      ) : <p className="mute">Nada pendiente: las actividades con fecha pasada tienen todas sus notas.</p>}
+      ) : <p className="mute">Nada pendiente{fg ? ' en este grupo' : ''}: las actividades con fecha pasada tienen todas sus notas.</p>}
 
-      <ClassroomAlerts info={cls} busy={clsBusy} refresh={clsRefresh} groups={live} students={data.students} activities={data.activities}
+      <ClassroomAlerts info={{ ...cls, missing: cls.missing.filter((x) => inG(x.groupId)), posts: cls.posts.filter((x) => inG(x.groupId)) }} busy={clsBusy} refresh={clsRefresh} groups={live} students={data.students} activities={data.activities}
         open={(g, a) => (a ? nav.grade(g.subjectId, g.id, a) : nav.notebook(g.subjectId, g.id))} />
 
       {warns.length > 0 && (

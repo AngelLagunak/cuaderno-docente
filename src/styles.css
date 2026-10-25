@@ -286,3 +286,16 @@ button.chip { min-height:32px; padding:3px 12px; font-weight:500; }
 }
 .secrow { align-items:center; margin:18px 0 8px; }
 .secrow h2.sec { margin:0; }
+
+/* ---------- Móvil estrecho (360 px): nada empuja la página hacia la derecha ---------- */
+.form { grid-template-columns:minmax(0, 1fr); }
+.form > * { min-width:0; }
+input[type=file] { width:100%; min-width:0; font-size:.84rem; padding:6px; }
+.sp > :first-child { min-width:0; overflow-wrap:anywhere; }
+.sp > .row:last-child { flex-wrap:nowrap; flex:none; }
+.mute.sub { display:block; font-size:.82rem; }
+@media (max-width: 600px) {
+  table.t td:first-child, table.t th:first-child { white-space:normal; min-width:92px; max-width:36vw; overflow-wrap:anywhere; font-size:.8rem; line-height:1.25; }
+}
+.nmShort { display:none; }
+@media (max-width: 600px) { .nmFull { display:none; } .nmShort { display:inline; } }

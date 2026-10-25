@@ -25,7 +25,7 @@ function StudentRow({ s }: { s: Student }) {
   if (!edit)
     return (
       <div className="issue sp">
-        <span><b>{s.lastName}</b>, {s.firstName} <span className="mute">{[s.nia, s.email].filter(Boolean).join(' · ')}</span></span>
+        <span><b>{s.lastName}</b>, {s.firstName}<span className="mute sub">{[s.nia, s.email].filter(Boolean).join(' · ')}</span></span>
         <span className="row" style={{ margin: 0 }}>
           <button className="small" onClick={() => { setD(s); setEdit(true); }}>Editar</button>
           <button className="small" onClick={() => confirm(`¿Borrar a ${s.firstName} ${s.lastName}?`) && softDelete(db.students, s)}>×</button>

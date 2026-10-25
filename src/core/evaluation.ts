@@ -101,7 +101,7 @@ export function termResult(
   termId: string,
   curr: Curr
 ): TermResult {
-  const acts = activities.filter((a) => a.termId === termId);
+  const acts = activities.filter((a) => a.termId === termId && !a.formative);
   const byInstrument: InstrumentResult[] = subject.instruments.map((i) => ({
     id: i.id,
     name: i.name,
@@ -216,7 +216,7 @@ export function profile(
   termId?: string
 ): Profile {
   const { children, ancestors } = aggregateTree(subject, links);
-  const acts = activities.filter((a) => !termId || a.termId === termId);
+  const acts = activities.filter((a) => (!termId || a.termId === termId) && !a.formative);
   const tw = new Map(subject.terms.map((t) => [t.id, t.weight]));
   const iw = new Map(subject.instruments.map((i) => [i.id, i.weight]));
   // nodo → grupo (evaluación|instrumento) → medidas [valor, peso de la actividad]

@@ -157,6 +157,11 @@ export interface Activity extends Stamp {
   rubricId?: ID;
   /** La nota se calcula con las observaciones del aula marcadas al pasar lista (dinámica del aula). */
   fromObs?: boolean;
+  /**
+   * Sin calificación (evaluación formativa): solo lleva, si acaso, un comentario al alumno. No cuenta en ninguna nota
+   * ni genera avisos de notas pendientes; sus criterios sí cuentan como trabajados en su unidad.
+   */
+  formative?: boolean;
   date?: string;
 }
 

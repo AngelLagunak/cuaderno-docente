@@ -1,6 +1,7 @@
 import { activityBase, aggregateTree, finalResult, indexGrades, noGrades, termResult } from './evaluation';
 import type { Curr, Num } from './evaluation';
 import { gradeSummary } from './progress';
+import { unitNodeIds } from './curriculum';
 import { absenceSummary } from './rules';
 import type { Activity, Attendance, CLink, CNode, Grade, Group, LearningUnit, Session, Student, Subject } from './model';
 
@@ -70,7 +71,8 @@ export function teacherReport(p: TrInput): TrGroup[] {
 
   return p.groups.map((g) => {
     const students = g.students.filter((x) => !x.deleted);
-    const allActs = g.activities.filter((a) => !a.deleted);
+    // Las actividades sin calificación no cuentan en notas, entregas ni cobertura.
+    const allActs = g.activities.filter((a) => !a.deleted && !a.formative);
     const acts = p.period === 'final' ? allActs : allActs.filter((a) => a.termId === p.period);
     const idx = indexGrades(g.grades.filter((x) => !x.deleted));
     const sg = (id: string) => idx.get(id) ?? noGrades();
@@ -126,7 +128,7 @@ export function teacherReport(p: TrInput): TrGroup[] {
       if (!students.some((st) => activityBase(a, sg(st.id)) != null)) continue;
       for (const id of a.nodeIds) { reached.add(id); ancestors(id).forEach((x) => reached.add(x)); }
     }
-    const planned = new Set(units.flatMap((u) => u.nodeIds.flatMap((id) => [id, ...ancestors(id)])));
+    const planned = new Set(units.flatMap((u) => unitNodeIds(u, g.activities).flatMap((id) => [id, ...ancestors(id)])));
     const target = p.period === 'final' || !units.length ? crits : crits.filter((n) => planned.has(n.id));
     const coverage = { evaluated: target.filter((n) => reached.has(n.id)).length, total: target.length, missing: target.filter((n) => !reached.has(n.id)).map((n) => n.code) };
     const unusedInstruments = s.instruments.filter((i) => i.weight > 0 && !acts.some((a) => a.instrumentId === i.id)).map((i) => i.name);

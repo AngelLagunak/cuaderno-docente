@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db, undoable } from '../data/db';
+import { db, saveActivity, undoable } from '../data/db';
 import { callScript } from '../data/api';
 import { describe, remapRubric } from '../data/classroomSync';
 import type { PullResult } from '../data/classroomSync';
@@ -24,7 +24,7 @@ export function RubricMap(p: { subject: Subject; act: Activity; nodes: CNode[]; 
   async function save() {
     const clean = Object.fromEntries(Object.entries(map).filter(([, v]) => v));
     const a = { ...act, classroomRubricMap: clean, nodeIds: [...new Set([...act.nodeIds, ...Object.values(clean)])], updatedAt: Date.now() };
-    await db.activities.put(a);
+    await saveActivity(a);
     p.onResult(await undoable('emparejamiento de rúbrica', () => remapRubric(a)));
   }
 

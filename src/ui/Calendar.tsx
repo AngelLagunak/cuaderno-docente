@@ -3,14 +3,14 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
 import { addDays, bySessionOrder, distribute, holidayItems, monday, parseHolidays, previousPending, schoolDays, unitBalance, ymd } from '../core/planning';
 import { DAYS, TimetableGrid } from './Timetable';
-import { useCurrentGroupId, useSchoolCalendar } from './hooks';
+import { useCurrentGroupId, useSubjectCalendar } from './hooks';
 import type { Activity, Group, LearningUnit, Session, Subject } from '../core/model';
 
 const dm = (s: string) => s.split('-').reverse().slice(0, 2).join('/');
 
 /** Generar sesiones a partir del horario semanal del grupo y el calendario escolar (sin días no lectivos). */
-function Generate({ group, existing, onDone }: { group: Group; existing: Session[]; onDone: (m: string) => void }) {
-  const cal = useSchoolCalendar(group.schoolYear);
+function Generate({ group, subject, existing, onDone }: { group: Group; subject: Subject; existing: Session[]; onDone: (m: string) => void }) {
+  const cal = useSubjectCalendar(subject, group.schoolYear);
   const [tt, setTt] = useState(group.timetable ?? []);
   const [from, setFrom] = useState(ymd(new Date()));
   const [to, setTo] = useState('');
@@ -141,7 +141,7 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
         <button className="small" onClick={() => setGen(!gen)}>Generar sesiones</button>
         <button className="small" disabled={!units.length || !sessions.length} onClick={spread}>Repartir unidades</button>
       </div>
-      {gen && <Generate group={group} existing={sessions} onDone={(m) => { setGen(false); if (m) setMsg(m); }} />}
+      {gen && <Generate group={group} subject={subject} existing={sessions} onDone={(m) => { setGen(false); if (m) setMsg(m); }} />}
       {msg && <p className="mute">{msg}</p>}
       <div className="row">
         <button className="small" onClick={() => setWeek(addDays(week, -7))}>‹</button>

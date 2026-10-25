@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
-import { holidayItems, parseCalendarText, parseHolidays, plannedSessions, schoolYearOf, weekday, ymd } from '../core/planning';
-import type { Group, SchoolCalendar as Cal } from '../core/model';
+import { holidayItems, parseCalendarText, parseHolidays, plannedSessions, schoolYearOf, subjectCalendar, weekday, ymd } from '../core/planning';
+import type { Group, SchoolCalendar as Cal, Subject } from '../core/model';
 import { TimetableGrid } from './Timetable';
 
 const dmy = (s: string) => (s ? s.split('-').reverse().join('/') : '—');
@@ -32,17 +32,20 @@ Reglas:
 - Termina con una línea que empiece por # con la fuente (nombre de la orden y fecha del BOA).`;
 }
 
-function GroupRow({ g, subject, cal }: { g: Group; subject: string; cal: Cal }) {
+function GroupRow({ g, subject, cal }: { g: Group; subject?: Subject; cal: Cal }) {
   const [open, setOpen] = useState(false);
   const tt = g.timetable ?? [];
-  const p = plannedSessions(cal, tt, g.holidays);
+  const sc = subject ? subjectCalendar(cal, subject)! : { ...cal, own: false, mismatch: false };
+  const p = plannedSessions(sc, tt, g.holidays);
   return (
     <>
       <tr>
-        <td>{g.name}<div className="mute">{subject}</div></td>
+        <td>{g.name}<div className="mute">{subject?.name}</div></td>
         <td className="sum">{tt.length || '—'}</td>
         <td className="sum">{p?.total ?? '—'}</td>
-        {cal.terms.map((t, i) => <td className="sum" key={i}>{p?.byTerm[i] ?? '—'}</td>)}
+        {sc.own || sc.mismatch
+          ? <td className="sum" colSpan={cal.terms.length}>{sc.own ? sc.terms.map((t, i) => `${t.name.replace(' evaluación', '')}: ${p?.byTerm[i] ?? '—'}`).join(' · ') : <span className="warn">Pon las fechas de sus evaluaciones en Evaluación y configuración</span>}</td>
+          : cal.terms.map((t, i) => <td className="sum" key={i}>{p?.byTerm[i] ?? '—'}</td>)}
         <td><button className="small" onClick={() => setOpen(!open)}>{open ? 'Cerrar' : 'Horario'}</button></td>
       </tr>
       {open && (
@@ -94,7 +97,6 @@ export function SchoolCalendar() {
   }
 
   const live = (groups ?? []).filter((g) => !g.deleted && g.schoolYear === year);
-  const subjectName = (id: string) => subjects?.find((s) => s.id === id)?.name ?? '';
 
   return (
     <div>
@@ -175,7 +177,7 @@ export function SchoolCalendar() {
         <div className="tw">
           <table className="t">
             <thead><tr><th>Grupo</th><th>h/sem</th><th>Curso</th>{saved.terms.map((t, i) => <th key={i}>{t.name}</th>)}<th></th></tr></thead>
-            <tbody>{live.map((g) => <GroupRow key={g.id} g={g} subject={subjectName(g.subjectId)} cal={saved} />)}</tbody>
+            <tbody>{live.map((g) => <GroupRow key={g.id} g={g} subject={subjects?.find((s) => s.id === g.subjectId)} cal={saved} />)}</tbody>
           </table>
         </div>
       )}

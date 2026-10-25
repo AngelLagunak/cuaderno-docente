@@ -4,6 +4,7 @@ import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Grou
 import { catalogs } from '../catalogs';
 import { migrateSubject, refreshedCatalogNodes } from '../core/curriculum';
 import { restoreChanges, takeSnapshot } from '../core/versions';
+import { propagate } from '../core/shared';
 
 class DB extends Dexie {
   subjects!: Table<Subject, string>;
@@ -84,6 +85,16 @@ export async function setLink(subjectId: string, relation: string, fromId: strin
 }
 
 export const uid = () => crypto.randomUUID();
+
+/** Guarda una actividad y, si es compartida entre grupos, iguala la programación de sus copias. */
+export async function saveActivity(a: Activity) {
+  const now = Date.now();
+  await db.activities.put({ ...a, updatedAt: now });
+  if (!a.shareId) return;
+  const sib = await db.activities.where('subjectId').equals(a.subjectId).filter((x) => x.shareId === a.shareId && x.id !== a.id && !x.deleted).toArray();
+  const upd = propagate(a, sib, now);
+  if (upd.length) await db.activities.bulkPut(upd);
+}
 
 export async function saveSubject(s: Subject) {
   await db.subjects.put({ ...s, updatedAt: Date.now() });

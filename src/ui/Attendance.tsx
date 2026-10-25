@@ -38,7 +38,7 @@ export function Attendance({ subject, preset }: { subject: Subject; preset?: { d
   const [slot, setSlot] = useState(preset?.slot ?? '1');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const planned = usePlannedSessions(group);
+  const planned = usePlannedSessions(group, subject);
   const [showObs, setShowObs] = useState(true);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);

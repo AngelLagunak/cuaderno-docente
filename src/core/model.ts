@@ -24,7 +24,11 @@ export interface RelationDef {
 }
 
 export interface Instrument { id: ID; name: string; weight: number }
-export interface Term { id: ID; name: string; weight: number }
+/**
+ * Evaluación de la materia. `start`/`end` (opcionales): fechas propias si la materia no sigue las evaluaciones del
+ * calendario escolar (p. ej. dos evaluaciones o un final de curso distinto).
+ */
+export interface Term { id: ID; name: string; weight: number; start?: string; end?: string }
 
 export interface SubjectConfig {
   passMark: number;
@@ -162,6 +166,11 @@ export interface Activity extends Stamp {
    * ni genera avisos de notas pendientes; sus criterios sí cuentan como trabajados en su unidad.
    */
   formative?: boolean;
+  /**
+   * Actividad compartida entre grupos: todas las copias (una por grupo, cada una con sus notas) llevan el mismo
+   * `shareId` y mantienen iguales los campos de la programación (ver `SHARED_FIELDS`).
+   */
+  shareId?: ID;
   date?: string;
 }
 

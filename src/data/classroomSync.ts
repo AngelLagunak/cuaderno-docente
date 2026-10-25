@@ -1,4 +1,4 @@
-import { db, saveGrade, saveItemGrade } from './db';
+import { db, saveActivity, saveGrade, saveItemGrade } from './db';
 import { callScript } from './api';
 import type { CGrades } from './api';
 import { autoMap, classify, pointsValue, rubricItems } from '../core/classroom';
@@ -31,7 +31,7 @@ export async function pullActivity(subject: Subject, act: Activity, group: Group
     const map = autoMap(r.rubric, nodes, gradedLevels(subject), act.classroomRubricMap ?? {});
     a = { ...a, rubric: r.rubric, classroomRubricMap: map, nodeIds: [...new Set([...a.nodeIds, ...Object.values(map)])] };
   } else if (r.rubricError) res.notes.push(`Rúbrica no disponible: ${r.rubricError}`);
-  if (JSON.stringify(a) !== JSON.stringify(act)) await db.activities.put({ ...a, updatedAt: Date.now() });
+  if (JSON.stringify(a) !== JSON.stringify(act)) await saveActivity(a);
 
   const load = async () => indexGrades(await db.grades.where('activityId').equals(act.id).toArray());
   let idx = await load();

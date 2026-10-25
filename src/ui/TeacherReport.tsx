@@ -6,7 +6,7 @@ import type { TrGroupInput } from '../core/teacherReport';
 import { round } from '../core/evaluation';
 import { plannedSessions, ymd } from '../core/planning';
 import type { Subject } from '../core/model';
-import { useGroups, useNodes, useSchoolCalendar } from './hooks';
+import { useGroups, useNodes, useSubjectCalendar } from './hooks';
 import { fmt } from './cells';
 
 /**
@@ -16,7 +16,7 @@ import { fmt } from './cells';
 export function TeacherReport({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
-  const cal = useSchoolCalendar(groups[0]?.schoolYear);
+  const cal = useSubjectCalendar(subject, groups[0]?.schoolYear);
   const today = ymd(new Date());
   // Por defecto, la evaluación en curso (o la última).
   const current = subject.terms.find((_, i) => { const r = cal?.terms[i]; return r?.start && r.end && today >= r.start && today <= r.end; });

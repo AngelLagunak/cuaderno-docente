@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, softDelete, uid } from '../data/db';
+import { db, saveActivity, softDelete, uid } from '../data/db';
+import { copyFor, matchWork } from '../core/shared';
 import { useCurrentGroupId, useGroups, useNodes } from './hooks';
 import { NodePicker } from './NodePicker';
 import { Rubrics } from './Rubrics';
@@ -101,10 +102,20 @@ function ClassroomLink(p: { a: Activity; group?: Group; others: Activity[]; node
   );
 }
 
-function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; others: Activity[]; init: Activity; onDone: () => void }) {
+function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; groups: Group[]; all: Activity[]; others: Activity[]; init: Activity; onDone: () => void }) {
   const [a, setA] = useState(p.init);
   const [w, setW] = useState(String(p.init.weight));
   const [pick, setPick] = useState(false);
+  // Grupos: una actividad nueva se crea por defecto en todos los grupos de la asignatura (mismos criterios).
+  const isNew = !p.all.some((x) => x.id === a.id);
+  const copies = a.shareId ? p.all.filter((x) => x.shareId === a.shareId && x.id !== a.id && !x.deleted) : [];
+  const have = new Set([a.groupId, ...copies.map((x) => x.groupId)]);
+  const otherGroups = p.groups.filter((g) => g.id !== a.groupId);
+  const [add, setAdd] = useState<string[]>(() => (isNew ? otherGroups.map((g) => g.id) : []));
+  const [detach, setDetach] = useState(false);
+  // Actividades iguales (mismo título) ya creadas en otros grupos: se pueden unir a esta.
+  const twin = (gid: string) => isNew ? undefined : matchWork(a.title, p.all.filter((x) => x.groupId === gid && !x.deleted && (!a.shareId || x.shareId !== a.shareId)));
+  const [join, setJoin] = useState<string[]>([]);
   return (
     <div className="card form">
       <input placeholder="Título de la actividad" value={a.title} onChange={(e) => setA({ ...a, title: e.target.value })} />
@@ -133,6 +144,24 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
       <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
       {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
       {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}
+      {otherGroups.length > 0 && (
+        <div className="groupsBox">
+          <b>Grupos que hacen esta actividad</b>
+          <div className="row">
+            <label><input type="checkbox" checked disabled /> {p.group?.name}</label>
+            {otherGroups.map((g) => {
+              if (have.has(g.id) && !detach) return <label key={g.id}><input type="checkbox" checked disabled /> {g.name}</label>;
+              const t = twin(g.id);
+              if (t) return <label key={g.id} title="Ya existe en ese grupo: se une a esta y toma sus criterios"><input type="checkbox" checked={join.includes(t.id)} disabled={detach} onChange={(e) => setJoin(e.target.checked ? [...join, t.id] : join.filter((x) => x !== t.id))} /> {g.name} (unir con la suya)</label>;
+              return <label key={g.id}><input type="checkbox" checked={add.includes(g.id)} disabled={detach} onChange={(e) => setAdd(e.target.checked ? [...add, g.id] : add.filter((x) => x !== g.id))} /> {g.name}</label>;
+            })}
+          </div>
+          <p className="mute">{copies.length && !detach
+            ? 'Compartida: título, evaluación, instrumento, peso, unidad, criterios y rúbrica se cambian en todos estos grupos. Cada grupo tiene sus notas, su fecha y su tarea de Classroom.'
+            : 'Se crea en cada grupo marcado con los mismos criterios; cada grupo se califica por separado.'}</p>
+          {copies.length > 0 && <label><input type="checkbox" checked={detach} onChange={(e) => setDetach(e.target.checked)} /> Separar de los demás grupos: los cambios solo se aplicarán en {p.group?.name}</label>}
+        </div>
+      )}
       <ClassroomLink a={a} group={p.group} others={p.others} nodes={p.nodes} onChange={async (patch) => {
         const next = { ...a, ...patch };
         setA(next);
@@ -146,7 +175,11 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
         <button className="on" disabled={!a.title.trim()} onClick={async () => {
           const rb = p.rubrics.find((r) => r.id === a.rubricId);
           const nodeIds = [...new Set([...a.nodeIds, ...(rb?.rows.map((x) => x.nodeId) ?? [])])];
-          await db.activities.put({ ...a, nodeIds, weight: Number(w) > 0 ? Number(w) : 1, updatedAt: Date.now() });
+          const shareId = detach ? undefined : add.length || copies.length || join.length ? a.shareId ?? uid() : a.shareId;
+          const final: Activity = { ...a, nodeIds, weight: Number(w) > 0 ? Number(w) : 1, shareId };
+          if (!detach && join.length) await db.activities.bulkPut(p.all.filter((x) => join.includes(x.id)).map((x) => ({ ...x, shareId, updatedAt: Date.now() })));
+          await saveActivity(final);
+          if (!detach && add.length) { const now = Date.now(); await db.activities.bulkPut(add.map((gid) => copyFor(final, gid, uid(), shareId!, now))); }
           p.onDone();
         }}>Guardar</button>
         <button onClick={p.onDone}>Cancelar</button>
@@ -156,8 +189,14 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
 }
 
 
-function WorkImport(p: { subject: Subject; group: Group; existing: Activity[]; onDone: () => void }) {
+/**
+ * Importar tareas de Classroom del grupo. Se pueden crear a la vez en los otros grupos de la asignatura (actividad
+ * compartida): si su curso de Classroom tiene una tarea con el mismo título, queda vinculada sola.
+ */
+function WorkImport(p: { subject: Subject; group: Group; groups: Group[]; all: Activity[]; existing: Activity[]; onDone: () => void }) {
   const [list, setList] = useState<CWork[] | null>(null);
+  const others = p.groups.filter((g) => g.id !== p.group.id);
+  const [also, setAlso] = useState<string[]>(() => others.map((g) => g.id));
   const [sel, setSel] = useState<string[]>([]);
   const [termId, setTermId] = useState(p.subject.terms[0]?.id ?? '');
   const [instId, setInstId] = useState(p.subject.instruments[0]?.id ?? '');
@@ -171,12 +210,34 @@ function WorkImport(p: { subject: Subject; group: Group; existing: Activity[]; o
   }
   async function imp() {
     const now = Date.now();
+    const share = also.length > 0;
     const rows = (list ?? []).filter((w) => sel.includes(w.id)).map((w): Activity => ({
       id: uid(), subjectId: p.subject.id, groupId: p.group.id, termId, instrumentId: instId, title: w.title, weight: 1,
       nodeIds: [], date: w.dueDate || undefined, classroomWorkId: w.id, maxPoints: w.maxPoints ?? undefined, updatedAt: now,
+      ...(share ? { shareId: uid() } : {}),
     }));
-    await db.activities.bulkPut(rows);
-    p.onDone();
+    const out: Activity[] = [...rows];
+    const report: string[] = [];
+    for (const gid of also) {
+      const g = p.groups.find((x) => x.id === gid)!;
+      let works: CWork[] = [];
+      if (g.classroomCourseId) {
+        setMsg(`Buscando las tareas en el Classroom de ${g.name}…`);
+        try { works = await callScript<CWork[]>('classroom.work.list', { courseId: g.classroomCourseId }); } catch { /* sin conexión: se crean sin vincular */ }
+      }
+      const taken = new Set(p.all.filter((x) => !x.deleted && x.groupId === gid).map((x) => x.classroomWorkId).filter((x): x is string => !!x));
+      let linked = 0;
+      for (const r of rows) {
+        const m = matchWork(r.title, works, taken);
+        const c = copyFor(r, gid, uid(), r.shareId!, now);
+        if (m) { taken.add(m.id); linked++; c.classroomWorkId = m.id; c.maxPoints = m.maxPoints ?? undefined; c.date = m.dueDate || c.date; }
+        out.push(c);
+      }
+      report.push(`${g.name}: ${g.classroomCourseId ? `${linked} de ${rows.length} vinculadas con Classroom` : 'sin curso de Classroom'}`);
+    }
+    await db.activities.bulkPut(out);
+    if (report.length) { setMsg(`Importadas ${rows.length} en ${p.group.name}. ${report.join(' · ')}. Las que no se vinculan solas se vinculan al editarlas.`); setList(null); setSel([]); }
+    else p.onDone();
   }
   return (
     <div className="card">
@@ -190,6 +251,13 @@ function WorkImport(p: { subject: Subject; group: Group; existing: Activity[]; o
             <select value={instId} onChange={(e) => setInstId(e.target.value)}>{p.subject.instruments.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
           </div>
           <p className="mute">Evaluación e instrumento se aplican a todas las seleccionadas; luego puedes editar cada una.</p>
+          {others.length > 0 && (
+            <div className="groupsBox">
+              <b>Crear también en</b>
+              <div className="row">{others.map((g) => <label key={g.id}><input type="checkbox" checked={also.includes(g.id)} onChange={(e) => setAlso(e.target.checked ? [...also, g.id] : also.filter((x) => x !== g.id))} /> {g.name}</label>)}</div>
+              <p className="mute">Actividad compartida: los criterios se ponen una vez para todos. Si el Classroom de cada grupo tiene una tarea con el mismo título, se vincula sola.</p>
+            </div>
+          )}
           <div className="picker">
             {list.map((w) => (
               <label key={w.id}>
@@ -236,6 +304,14 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
   const contents = nodes.filter((n) => contentLevels.some((l) => l.key === n.level));
   const inUnits = (id: string) => units.filter((u) => u.nodeIds.includes(id));
 
+  const siblingsOf = (a: Activity) => (a.shareId ? (actsRaw ?? []).filter((x) => !x.deleted && x.shareId === a.shareId && x.id !== a.id) : []);
+  const sharedWith = (a: Activity) => { const s = siblingsOf(a); return s.length ? ` · también en ${s.map((x) => groups.find((g) => g.id === x.groupId)?.name ?? '?').join(', ')}` : ''; };
+  async function removeAct(a: Activity) {
+    const sib = siblingsOf(a);
+    if (sib.length && confirm(`«${a.title}» está también en ${sib.length === 1 ? 'otro grupo' : `${sib.length} grupos más`}. ¿Borrarla en TODOS los grupos (con sus notas)?\n\nAceptar: en todos · Cancelar: elegir solo este grupo`)) {
+      for (const x of [a, ...sib]) await softDelete(db.activities, x);
+    } else if (confirm(`¿Borrar “${a.title}” en ${group?.name ?? 'este grupo'}?`)) await softDelete(db.activities, a);
+  }
   const newUnit = () => setEu({ id: uid(), subjectId: subject.id, code: `UD${units.length + 1}`, title: '', termId: subject.terms[0]?.id ?? '', plannedSessions: 0, nodeIds: [], updatedAt: Date.now() });
   const newAct = () => setEa({ id: uid(), subjectId: subject.id, groupId: group!.id, termId: subject.terms[0]?.id ?? '', instrumentId: subject.instruments[0]?.id ?? '', title: '', weight: 1, nodeIds: [], updatedAt: Date.now() });
 
@@ -285,9 +361,9 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
             {!ea && <button onClick={newAct}>+ Actividad</button>}
             {group?.classroomCourseId && <button onClick={() => setImp(!imp)}>Importar de Classroom</button>}
           </div>
-          {imp && group && <WorkImport subject={subject} group={group} existing={acts} onDone={() => setImp(false)} />}
+          {imp && group && <WorkImport subject={subject} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} existing={acts} onDone={() => setImp(false)} />}
           {noItems.size > 0 && <p className="warn">⚠ {noItems.size === 1 ? '1 actividad' : `${noItems.size} actividades`} sin criterio: solo admiten nota global y no aportan al perfil competencial.</p>}
-          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} rubrics={rubrics} group={group} others={acts} init={ea} onDone={() => setEa(null)} />}
+          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} rubrics={rubrics} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} others={acts} init={ea} onDone={() => setEa(null)} />}
           {subject.terms.map((t) => {
             const list = acts.filter((a) => a.termId === t.id);
             return (
@@ -300,7 +376,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}{a.formative ? ' · sin calificación' : ''}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}{a.formative ? ' · sin calificación' : ''}{sharedWith(a)}
                         </div>
                         {noItems.has(a.id) && <div className="warn mute">⚠ Sin criterio</div>}
                         <div className="chips">
@@ -309,7 +385,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
                       </div>
                       <div className="row" style={{ margin: 0 }}>
                         <button className="small" onClick={() => setEa(a)}>Editar</button>
-                        <button className="small" onClick={() => confirm(`¿Borrar “${a.title}”?`) && softDelete(db.activities, a)}>×</button>
+                        <button className="small" onClick={() => removeAct(a)}>×</button>
                       </div>
                     </div>
                   )

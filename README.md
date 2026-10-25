@@ -8,14 +8,14 @@ Está pensado para la evaluación por competencias de la LOMLOE (currículo de A
 
 - **Hoy**: las clases del día según tu horario, con la que toca ahora. Desde aquí pasas lista y anotas lo realizado y lo pendiente. También ves lo que queda por corregir y los avisos (faltas, Classroom, copia de seguridad).
 - **Cuaderno**: notas por evaluación y nota final. Se califica alumno a alumno con un toque por criterio (rúbrica), y la nota se calcula en cascada: criterios → competencias específicas → evaluación → final.
-- **Planificar**: unidades didácticas, sesiones en el calendario, actividades con sus criterios, rúbricas y cobertura del currículo.
+- **Planificar**: unidades didácticas (con sus saberes), sesiones en el calendario, actividades con sus criterios, rúbricas y cobertura del currículo. Una actividad puede ser **compartida por varios grupos** (criterios una sola vez, notas por grupo) o **sin calificación** (solo comentario).
 - **Seguimiento**: avance de la programación, resultados del grupo y un **informe del docente** por evaluación y curso, con puntos fuertes y áreas de mejora.
 - **Asistencia**: lista en tarjetas o en tabla (presente, ausente, retraso, justificada), observaciones del aula y aviso de faltas.
 - **Informes**: ficha de cada alumno con su perfil competencial, y vista del grupo. Se imprimen en PDF.
 - **Comunicación con el alumnado**: correos con plantillas y marcadores, y anuncios en el tablón de Classroom.
 - **Programación didáctica**: documento con los apartados que pide la normativa. Lo que sale de tus datos se genera solo; el resto se redacta en la app. Se imprime en PDF o se descarga para Word.
 - **Currículo**: competencias específicas, criterios, concreciones, descriptores, saberes y objetivos de etapa. Incluye matriz, mapa de relaciones, carga con ayuda de una IA y versiones guardadas.
-- **Calendario escolar**: festivos, fechas de las evaluaciones, horas del centro y horario de cada grupo. Con ellos calcula las sesiones previstas.
+- **Calendario escolar**: festivos, fechas de las evaluaciones, horas del centro y horario de cada grupo. Con ellos calcula las sesiones previstas. Una asignatura con otras evaluaciones (p. ej. dos, o con otro final de curso) puede tener sus propias fechas.
 - **Google Classroom**: importa alumnado y tareas, trae notas y rúbricas, crea tareas y envía notas. Avisa de entregas sin corregir, tareas sin entregar, comentarios y publicaciones del alumnado.
 - **Exportar**: Excel, CSV y relleno del listado de calificaciones de SIGAD (.xls).
 - **Copias**: sincronización entre dispositivos, copia diaria en Drive y copia descargable.

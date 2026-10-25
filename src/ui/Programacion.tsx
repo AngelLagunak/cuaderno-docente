@@ -5,7 +5,7 @@ import { PD_SECTIONS, defaultNorm, parsePdTexts, pdBase, pdDocument, pdHtml, pdI
 import type { PdData } from '../core/pd';
 import { plannedSessions } from '../core/planning';
 import type { PdInfo, Subject } from '../core/model';
-import { useCurrentGroupId, useGroups, useNodes, useSchoolCalendar } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes, useSubjectCalendar } from './hooks';
 
 /**
  * Programación didáctica lista para entregar: los apartados de currículo, unidades, instrumentos y calificación salen
@@ -16,7 +16,7 @@ export function Programacion({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
-  const cal = useSchoolCalendar(group?.schoolYear);
+  const cal = useSubjectCalendar(subject, group?.schoolYear);
   const [info, setInfo] = useState<PdInfo>(() => ({ norm: defaultNorm(subject), year: '', ...subject.pd, texts: { ...subject.pd?.texts } }));
   const [tab, setTab] = useState<'edit' | 'doc'>('edit');
   const [answer, setAnswer] = useState('');

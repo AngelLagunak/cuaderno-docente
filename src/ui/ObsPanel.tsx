@@ -5,7 +5,7 @@ import type { StudentGrades } from '../core/evaluation';
 import { obsGrade } from '../core/rules';
 import { defaultObservations } from '../core/model';
 import type { Activity, Attendance, Group, Student, Subject } from '../core/model';
-import { useSchoolCalendar } from './hooks';
+import { useSubjectCalendar } from './hooks';
 import { fmt } from './cells';
 
 /**
@@ -14,7 +14,7 @@ import { fmt } from './cells';
  */
 export function ObsPanel(p: { subject: Subject; group: Group; act: Activity; students: Student[]; att: Attendance[]; sgOf: (s: Student) => StudentGrades; onMsg: (m: string) => void }) {
   const { subject, act } = p;
-  const cal = useSchoolCalendar(p.group.schoolYear);
+  const cal = useSubjectCalendar(subject, p.group.schoolYear);
   const ti = subject.terms.findIndex((t) => t.id === act.termId);
   const range = cal?.terms[ti];
   const [from, setFrom] = useState<string | null>(null);

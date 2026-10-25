@@ -130,3 +130,23 @@ export function previousPending(sessions: Session[], s: Session): string {
   const i = live.findIndex((x) => x.id === s.id);
   return i > 0 ? live[i - 1].pending ?? '' : '';
 }
+
+/**
+ * Calendario de una materia: el escolar, salvo las evaluaciones con fechas propias. Si la materia tiene otro número de
+ * evaluaciones y no les ha puesto fechas, quedan sin fechas (no se emparejan por orden con las del centro).
+ * Con fechas propias, el curso de la materia va del primer inicio al último fin.
+ */
+export function subjectCalendar<C extends { start: string; end: string; holidays: string; terms: { name: string; start: string; end: string }[] }>(
+  cal: C | undefined, subject: { terms: { name: string; start?: string; end?: string }[] },
+): (Omit<C, 'terms'> & { terms: { name: string; start: string; end: string }[]; own: boolean; mismatch: boolean }) | undefined {
+  const own = subject.terms.some((t) => t.start && t.end);
+  if (!cal && !own) return undefined;
+  const same = !!cal && cal.terms.length === subject.terms.length;
+  const terms = subject.terms.map((t, i) => (t.start && t.end ? { name: t.name, start: t.start, end: t.end }
+    : same ? { name: t.name, start: cal!.terms[i].start, end: cal!.terms[i].end } : { name: t.name, start: '', end: '' }));
+  const dated = terms.filter((t) => t.start && t.end);
+  const start = own ? dated.map((t) => t.start).sort()[0] : cal!.start;
+  const end = own ? dated.map((t) => t.end).sort().reverse()[0] : cal!.end;
+  const base = (cal ?? { holidays: '' }) as C;
+  return { ...base, start, end, terms, own, mismatch: !own && !same };
+}

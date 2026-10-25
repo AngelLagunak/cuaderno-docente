@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distribute, holidayItems, monday, parseCalendarText, parseHolidays, plannedSessions, previousPending, schoolDays, schoolYearOf, unitBalance, weekday } from './planning';
+import { distribute, holidayItems, monday, parseCalendarText, parseHolidays, plannedSessions, previousPending, subjectCalendar, schoolDays, schoolYearOf, unitBalance, weekday } from './planning';
 import type { LearningUnit, Session } from './model';
 
 describe('fechas', () => {
@@ -86,5 +86,29 @@ describe('calendario escolar', () => {
     const list = [s('b', '2026-10-07', '1'), s('a', '2026-10-05', '3', 'Acabar bocetos'), s('x', '2026-10-06', '1', 'otro grupo', 'h')];
     expect(previousPending(list, list[0])).toBe('Acabar bocetos');
     expect(previousPending(list, list[1])).toBe('');
+  });
+});
+
+describe('calendario de cada materia', () => {
+  const cal = { id: '2026/27', start: '2026-09-08', end: '2027-06-18', holidays: '2026-10-12 Pilar', updatedAt: 0,
+    terms: [{ name: '1.ª', start: '2026-09-08', end: '2026-11-27' }, { name: '2.ª', start: '2026-11-30', end: '2027-03-12' }, { name: '3.ª', start: '2027-03-15', end: '2027-06-18' }] };
+  const t = (name: string, start?: string, end?: string) => ({ id: name, name, weight: 1, start, end });
+  it('con las mismas evaluaciones usa las del calendario escolar', () => {
+    const c = subjectCalendar(cal, { terms: [t('1'), t('2'), t('3')] })!;
+    expect(c.terms.map((x) => x.end)).toEqual(['2026-11-27', '2027-03-12', '2027-06-18']);
+    expect([c.own, c.mismatch]).toEqual([false, false]);
+  });
+  it('con otro número de evaluaciones y sin fechas, no las empareja por orden', () => {
+    const c = subjectCalendar(cal, { terms: [t('1'), t('2')] })!;
+    expect(c.terms.map((x) => x.start)).toEqual(['', '']);
+    expect(c.mismatch).toBe(true);
+    expect(plannedSessions(c, [{ weekday: 1, slot: '1' }])!.byTerm).toEqual([null, null]);
+  });
+  it('fechas propias: dos evaluaciones y final más tarde; festivos del centro', () => {
+    const c = subjectCalendar(cal, { terms: [t('1', '2026-09-14', '2027-01-29'), t('2', '2027-02-01', '2027-06-25')] })!;
+    expect([c.start, c.end, c.own]).toEqual(['2026-09-14', '2027-06-25', true]);
+    const p = plannedSessions(c, [{ weekday: 1, slot: '1' }])!;
+    expect(p.byTerm[0]! + p.byTerm[1]!).toBe(p.total);
+    expect(schoolDays('2026-10-12', '2026-10-12', [{ weekday: 1, slot: '1' }], parseHolidays(c.holidays))).toEqual([]);
   });
 });

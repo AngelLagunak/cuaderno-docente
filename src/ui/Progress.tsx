@@ -5,7 +5,7 @@ import { indexGrades, noGrades, round, termResult, activityBase } from '../core/
 import { BUCKETS, gradeSummary, sessionProgress } from '../core/progress';
 import { parseHolidays, ymd } from '../core/planning';
 import type { Subject } from '../core/model';
-import { useCurrentGroupId, useGroups, useNodes, useSchoolCalendar } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes, useSubjectCalendar } from './hooks';
 import { fmt, raw } from './cells';
 import { TeacherReport } from './TeacherReport';
 
@@ -17,7 +17,7 @@ export function Progress({ subject }: { subject: Subject }) {
   const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const nodes = useNodes(subject.id);
-  const cal = useSchoolCalendar(group?.schoolYear);
+  const cal = useSubjectCalendar(subject, group?.schoolYear);
   const [tab, setTab] = useState<'plan' | 'res' | 'rep'>('plan');
   const [termId, setTermId] = useState(subject.terms[0]?.id ?? '');
   const today = ymd(new Date());

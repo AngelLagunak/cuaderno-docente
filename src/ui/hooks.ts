@@ -1,8 +1,8 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
-import { plannedSessions } from '../core/planning';
-import type { Group } from '../core/model';
+import { plannedSessions, subjectCalendar } from '../core/planning';
+import type { Group, Subject } from '../core/model';
 
 export function useGroups(subjectId: string) {
   const r = useLiveQuery(() => db.groups.where('subjectId').equals(subjectId).toArray(), [subjectId]);
@@ -22,9 +22,14 @@ export function useSchoolCalendar(schoolYear?: string) {
   }, [schoolYear]);
 }
 
-/** Sesiones previstas del grupo en todo el curso (horario × calendario escolar), si se pueden calcular. */
-export function usePlannedSessions(group?: Group) {
-  const cal = useSchoolCalendar(group?.schoolYear);
+/** Calendario de la materia: el escolar con las fechas propias de sus evaluaciones, si las tiene. */
+export function useSubjectCalendar(subject: Pick<Subject, 'terms'>, schoolYear?: string) {
+  return subjectCalendar(useSchoolCalendar(schoolYear), subject);
+}
+
+/** Sesiones previstas del grupo en todo el curso (horario × calendario de la materia), si se pueden calcular. */
+export function usePlannedSessions(group: Group | undefined, subject: Pick<Subject, 'terms'>) {
+  const cal = useSubjectCalendar(subject, group?.schoolYear);
   return group ? plannedSessions(cal, group.timetable ?? [], group.holidays)?.total : undefined;
 }
 

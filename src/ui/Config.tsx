@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { db, saveSubject, softDelete } from '../data/db';
 import { defaultObservations } from '../core/model';
 import type { ObsAspect, Subject } from '../core/model';
+import { useSchoolCalendar } from './hooks';
 
 const slug = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nivel';
@@ -18,6 +19,10 @@ export function Config({ subject }: { subject: Subject }) {
   const lbl = (k: string) => d.levels.find((l) => l.key === k)?.label ?? k;
   const obs = d.config.observations ?? defaultObservations();
   const setObs = (o: ObsAspect[]) => cfg({ observations: o });
+  const cal = useSchoolCalendar();
+  const ownDates = d.terms.some((t) => t.start || t.end);
+  const [showDates, setShowDates] = useState(ownDates);
+  const setTerm = (k: number, p: Partial<Subject['terms'][number]>) => set({ terms: d.terms.map((x, j) => (j === k ? { ...x, ...p } : x)) });
 
   async function removeSubject() {
     const n = await db.groups.where('subjectId').equals(d.id).filter((g) => !g.deleted).count();
@@ -87,6 +92,22 @@ export function Config({ subject }: { subject: Subject }) {
           </div>
         ))}
         <button className="small" onClick={() => set({ terms: [...d.terms, { id: 't' + Date.now().toString(36), name: 'Nueva evaluación', weight: 0 }] })}>+ Evaluación</button>
+        <label className="row"><input type="checkbox" checked={showDates} onChange={(e) => {
+          setShowDates(e.target.checked);
+          if (!e.target.checked) set({ terms: d.terms.map(({ start: _s, end: _e, ...x }) => x) });
+          else if (!ownDates && cal && cal.terms.length === d.terms.length) set({ terms: d.terms.map((x, i) => ({ ...x, start: cal.terms[i].start || undefined, end: cal.terms[i].end || undefined })) });
+        }} /> Fechas propias: esta asignatura no sigue las evaluaciones del calendario escolar (otro número de evaluaciones u otro final de curso)</label>
+        {!showDates && cal && cal.terms.length !== d.terms.length && (
+          <p className="warn">El calendario escolar tiene {cal.terms.length} evaluaciones y esta asignatura {d.terms.length}: marca «Fechas propias» y pon sus fechas para calcular bien las sesiones de cada evaluación.</p>
+        )}
+        {showDates && d.terms.map((t, k) => (
+          <div className="row" key={t.id}>
+            <b style={{ minWidth: 110 }}>{t.name}</b>
+            <label>Del <input type="date" value={t.start ?? ''} onChange={(e) => setTerm(k, { start: e.target.value || undefined })} /></label>
+            <label>al <input type="date" value={t.end ?? ''} onChange={(e) => setTerm(k, { end: e.target.value || undefined })} /></label>
+          </div>
+        ))}
+        {showDates && <p className="mute">Las sesiones previstas, el seguimiento y el informe usan estas fechas; los días no lectivos siguen siendo los del calendario escolar. El curso de la asignatura termina el último día de su última evaluación.</p>}
       </div></details>
 
       <details className="card sect"><summary>Cálculo de la nota, recuperaciones y extraordinaria</summary>

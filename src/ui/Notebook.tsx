@@ -77,7 +77,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
   const [items, setItems] = useState(true);
   const [gid, setGid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
-  const planned = usePlannedSessions(group);
+  const planned = usePlannedSessions(group, subject);
   const atRaw = useLiveQuery(() => (group ? db.attendance.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const [view, setView] = useState<'table' | 'act' | 'final'>(focusAct ? 'act' : 'table');
   const [termId, setTermId] = useState('');

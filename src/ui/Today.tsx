@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, uid } from '../data/db';
-import { addDays, parseHolidays, plannedSessions, schoolYearOf, ymd } from '../core/planning';
+import { addDays, parseHolidays, plannedSessions, schoolYearOf, subjectCalendar, ymd } from '../core/planning';
 import { classesOfDay, pendingBefore, toGrade } from '../core/today';
 import type { DayClass } from '../core/today';
 import { absenceSummary } from '../core/rules';
@@ -160,7 +160,7 @@ export function Today({ nav }: { nav: TodayNav }) {
     const s = subjectOf(g.subjectId)!;
     const rows = attendance.filter((r) => r.groupId === g.id);
     if (!rows.length) continue;
-    const planned = plannedSessions(cal, g.timetable ?? [], g.holidays)?.total;
+    const planned = plannedSessions(subjectCalendar(cal, s), g.timetable ?? [], g.holidays)?.total;
     for (const st of data.students.filter((x) => !x.deleted && x.groupId === g.id)) {
       const a = absenceSummary(s, rows, st.id, planned);
       if (a.warn && !st.lec) warns.push({ text: `${st.firstName} ${st.lastName} (${g.name}) · ${a.pct.toFixed(0)} % de faltas injustificadas` });

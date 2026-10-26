@@ -30,6 +30,8 @@ const SECTIONS: { title: string; items: [View, string, string][] }[] = [
 ];
 const TITLE: Record<View, string> = { hoy: 'Hoy', notes: 'Cuaderno', plan: 'Planificar', seg: 'Seguimiento', more: 'Más', att: 'Asistencia', groups: 'Grupos y alumnos', rep: 'Informes', comm: 'Comunicación', curr: 'Currículo', config: 'Evaluación y configuración', cal: 'Calendario escolar', conn: 'Conexión y copias', new: 'Nueva asignatura', pd: 'Programación didáctica' };
 /** Pantallas que trabajan sobre una asignatura y un grupo (llevan el selector arriba). */
+/** De qué sección cuelga cada pantalla (para la flecha atrás). */
+const PARENT: Partial<Record<View, View>> = { seg: 'plan', att: 'more', groups: 'more', rep: 'more', comm: 'more', curr: 'more', config: 'more', cal: 'more', conn: 'more', new: 'more', pd: 'more' };
 const WITH_CONTEXT = new Set<View>(['notes', 'plan', 'seg', 'att', 'groups', 'rep', 'comm', 'curr', 'config', 'pd']);
 /** Pantallas de la asignatura (no dependen del grupo). */
 const SUBJECT_ONLY = new Set<View>(['curr', 'config', 'pd']);
@@ -49,7 +51,20 @@ const readLS = (k: string) => { try { return localStorage.getItem(k) ?? ''; } ca
 const writeLS = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* sin almacenamiento */ } };
 
 export function App() {
-  const [view, setView] = useState<View>('hoy');
+  const [view, setViewState] = useState<View>('hoy');
+  // Cada pantalla es un paso del historial: el botón atrás del móvil vuelve a la anterior en vez de salir de la app.
+  useEffect(() => {
+    if (!history.state?.view) history.replaceState({ view: 'hoy', depth: 0 }, '');
+    const onPop = (e: PopStateEvent) => { setViewState((e.state?.view as View) ?? 'hoy'); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const setView = (v: View) => {
+    if (v !== (history.state?.view ?? 'hoy')) history.pushState({ view: v, depth: (history.state?.depth ?? 0) + 1 }, '');
+    setViewState(v);
+  };
+  /** Flecha atrás: la pantalla anterior; si se abrió directamente, la sección de la que cuelga. */
+  const back = () => { if ((history.state?.depth ?? 0) > 0) history.back(); else go(PARENT[view] ?? 'hoy'); };
   const [sid, setSidState] = useState(readLS('subjectId'));
   const setSid = (id: string) => { setSidState(id); writeLS('subjectId', id); };
   const [gid] = useCurrentGroupId();
@@ -108,7 +123,10 @@ export function App() {
 
       <main className="main">
         <header className="topbar noprint">
-          <h1>{TITLE[view]}</h1>
+          <div className="titlebar">
+            {PARENT[view] && <button className="backbtn" aria-label="Atrás" onClick={back}><Icon name="left" size={22} /></button>}
+            <h1>{TITLE[view]}</h1>
+          </div>
           <SyncBar />
         </header>
         {context && subjects.length > 0 && <div className="row noprint">{context}</div>}

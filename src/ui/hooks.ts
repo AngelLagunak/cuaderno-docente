@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
 import { plannedSessions, subjectCalendar } from '../core/planning';
@@ -45,4 +45,25 @@ export function setCurrentGroup(id: string) {
 export function useCurrentGroupId(): [string, (id: string) => void] {
   const id = useSyncExternalStore((f) => { groupSubs.add(f); return () => { groupSubs.delete(f); }; }, () => currentGroup);
   return [id, setCurrentGroup];
+}
+
+/**
+ * Paso interno de una pantalla (p. ej. calificar una actividad dentro del Cuaderno): mientras `active`, el botón atrás
+ * del móvil llama a `onBack` en lugar de salir de la pantalla.
+ */
+export function useBackStep(active: boolean, onBack: () => void) {
+  const cb = useRef(onBack);
+  cb.current = onBack;
+  useEffect(() => {
+    if (!active) return;
+    const step = Math.random().toString(36).slice(2);
+    history.pushState({ ...history.state, step }, '');
+    const onPop = () => cb.current();
+    window.addEventListener('popstate', onPop, { once: true });
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // Cerrado desde la propia pantalla: se quita el paso del historial (si sigue siendo el último).
+      if (history.state?.step === step) history.back();
+    };
+  }, [active]);
 }

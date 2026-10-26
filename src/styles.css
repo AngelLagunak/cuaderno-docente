@@ -302,3 +302,5 @@ input[type=file] { width:100%; min-width:0; font-size:.84rem; padding:6px; }
 .groupsBox { border:1px solid var(--line); border-radius:12px; padding:10px 12px; display:grid; gap:4px; }
 .groupsBox .row { margin:2px 0; gap:6px 16px; }
 .groupsBox label { display:inline-flex; gap:6px; align-items:center; }
+.titlebar { display:flex; align-items:center; gap:4px; min-width:0; }
+.backbtn { flex:none; min-height:40px; width:40px; padding:0; display:inline-flex; align-items:center; justify-content:center; border:0; background:none; color:var(--brand); margin-left:-8px; }

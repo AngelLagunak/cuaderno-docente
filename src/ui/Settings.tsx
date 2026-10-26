@@ -20,7 +20,7 @@ function SyncPanel() {
         <button className="on" onClick={() => syncNow()} disabled={st.state === 'syncing'}>Sincronizar ahora</button>
         <button onClick={async () => { setMsg('Copiando…'); try { const r = await callScript<{ name: string; kept: number }>('backup.run'); setMsg(`Copia ${r.name} (${r.kept} guardadas)`); } catch (e) { setMsg('Error: ' + (e as Error).message); } }}>Copia en Drive ahora</button>
       </div>
-      <p className="mute">{st.state === 'ok' ? `Última sincronización: ${st.last ? new Date(st.last).toLocaleTimeString('es-ES') : ''}. ` : ''}{st.msg ?? ''} · {st.pending} cambios pendientes</p>
+      <p className={st.state === 'error' ? 'warn' : 'mute'}>{st.state === 'ok' ? `Última sincronización: ${st.last ? new Date(st.last).toLocaleTimeString('es-ES') : ''}. ` : ''}{st.state === 'error' ? 'Error: ' : ''}{st.msg ?? ''} · {st.pending} cambios pendientes</p>
       {msg && <p className="mute">{msg}</p>}
     </div>
   );

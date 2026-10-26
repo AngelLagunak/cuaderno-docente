@@ -44,7 +44,9 @@ function SyncBar() {
     : st.state === 'syncing' ? ['Sincronizando…', 'off']
     : st.state === 'error' ? [`Error de sincronización`, 'bad']
     : st.pending ? [`${st.pending} cambios pendientes`, 'off'] : [`Sincronizado ${t}`, 'ok'];
-  return <button className={'sync noprint ' + cls} onClick={() => syncNow()} title={st.msg ?? 'Sincronizar ahora'}><span className="dot" />{label}</button>;
+  // En el móvil no hay «title»: al tocar un error se muestra el mensaje antes de reintentar.
+  const tap = () => { if (st.state === 'error' && st.msg) alert(`Error de sincronización:\n\n${st.msg}\n\nSe vuelve a intentar al cerrar este aviso.`); syncNow(); };
+  return <button className={'sync noprint ' + cls} onClick={tap} title={st.msg ?? 'Sincronizar ahora'}><span className="dot" />{label}</button>;
 }
 
 const readLS = (k: string) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } };

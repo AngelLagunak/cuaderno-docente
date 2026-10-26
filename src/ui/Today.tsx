@@ -24,7 +24,8 @@ const EMPTY: ClsInfo = { at: 0, pending: [], missing: [], posts: [], comments: [
  * Se guarda 15 minutos para no consultar en cada visita.
  */
 function useClassroom(): [ClsInfo, boolean, () => void] {
-  const read = (): ClsInfo => { try { const c = JSON.parse(sessionStorage.getItem('clsInfo') || 'null'); return c && Date.now() - c.at < 15 * 60_000 ? c : EMPTY; } catch { return EMPTY; } };
+  // La consulta guardada solo vale para la misma conexión (al cambiar la URL del Apps Script se descarta).
+  const read = (): ClsInfo => { try { const c = JSON.parse(sessionStorage.getItem('clsInfo') || 'null'); return c && Date.now() - c.at < 15 * 60_000 && c.url === localStorage.getItem('scriptUrl') ? c : EMPTY; } catch { return EMPTY; } };
   const [info, setInfo] = useState<ClsInfo>(read);
   const [busy, setBusy] = useState(false);
   const [tick, setTick] = useState(0);
@@ -33,7 +34,13 @@ function useClassroom(): [ClsInfo, boolean, () => void] {
     (async () => {
       if (tick === 0 && read().at) return;
       if (!configured() || !navigator.onLine) return;
-      const groups = (await db.groups.toArray()).filter((g) => !g.deleted && g.classroomCourseId);
+      // Un curso de Classroom se consulta una sola vez, aunque esté enlazado a varios grupos; solo grupos de
+      // asignaturas que existen, y antes los que tienen alumnado.
+      const subjects = new Set((await db.subjects.toArray()).filter((s) => !s.deleted).map((s) => s.id));
+      const withStudents = new Set((await db.students.toArray()).filter((s) => !s.deleted).map((s) => s.groupId));
+      const linked = (await db.groups.toArray()).filter((g) => !g.deleted && g.classroomCourseId && subjects.has(g.subjectId))
+        .sort((a, b) => Number(withStudents.has(b.id)) - Number(withStudents.has(a.id)));
+      const groups = linked.filter((g, i) => linked.findIndex((x) => x.classroomCourseId === g.classroomCourseId) === i);
       if (!groups.length) return;
       setBusy(true);
       const out: ClsInfo = { ...EMPTY, at: Date.now(), errors: [] };
@@ -53,7 +60,7 @@ function useClassroom(): [ClsInfo, boolean, () => void] {
       catch (e) { out.errors.push(`Comentarios: ${String((e as Error).message ?? e)}`); }
       if (done) return;
       setInfo(out); setBusy(false);
-      try { sessionStorage.setItem('clsInfo', JSON.stringify(out)); } catch { /* sin almacenamiento */ }
+      try { sessionStorage.setItem('clsInfo', JSON.stringify({ ...out, url: localStorage.getItem('scriptUrl') })); } catch { /* sin almacenamiento */ }
     })().catch(() => setBusy(false));
     return () => { done = true; };
   }, [tick]);
@@ -171,6 +178,13 @@ export function Today({ nav }: { nav: TodayNav }) {
   const days = last ? Math.floor((Date.now() - last) / 86400000) : null;
   if (days == null || days > 14) warns.push({ text: days == null ? 'Aún no has descargado ninguna copia de seguridad' : `Copia de seguridad descargada hace ${days} días`, go: () => nav.go('conn') });
   if (!cal) warns.push({ text: 'Falta el calendario escolar del curso (festivos y evaluaciones)', go: () => nav.go('cal') });
+  // Grupos repetidos (mismo nombre en la misma asignatura) o varios grupos enlazados al mismo curso de Classroom.
+  for (const g of live) {
+    const dupName = live.filter((x) => x.subjectId === g.subjectId && x.name.trim().toLowerCase() === g.name.trim().toLowerCase());
+    if (dupName[0] === g && dupName.length > 1) warns.unshift({ text: `Hay ${dupName.length} grupos «${g.name}» en ${subjectOf(g.subjectId)!.name}: borra los que sobren en Grupos y alumnos`, go: () => nav.groups(g.subjectId, g.id) });
+    const dupCourse = live.filter((x) => g.classroomCourseId && x.classroomCourseId === g.classroomCourseId);
+    if (dupCourse[0] === g && dupCourse.length > 1 && new Set(dupCourse.map((x) => x.name)).size > 1) warns.unshift({ text: `${dupCourse.map((x) => x.name).join(', ')} están enlazados al mismo curso de Classroom`, go: () => nav.groups(g.subjectId, g.id) });
+  }
 
   return (
     <div className="today">

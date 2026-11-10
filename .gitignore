@@ -1,5 +1,16 @@
 node_modules
 dist
+
+# Datos que nunca deben subirse: copias, exportaciones y listados con alumnado.
 cuaderno-docente-*.json
-notas-*.csv
-asistencia-*.csv
+*.csv
+*.xls
+*.xlsx
+*.doc
+*.docx
+*.pdf
+
+# Claves y configuración local.
+.env
+.env.*
+*.local

@@ -2,36 +2,53 @@ name: Desplegar
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+
+# Por defecto, sin permisos: cada trabajo pide solo los que necesita.
+permissions: {}
+
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      # Las acciones van fijadas a un commit concreto (Dependabot propone las actualizaciones).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
-      - run: npm ci
-      # Si falla la comprobación de tipos o algún test, no se publica.
+          cache: npm
+      # Instalación exacta del lockfile y sin ejecutar scripts de los paquetes.
+      - run: npm ci --ignore-scripts
+      # Si falla algo de esto, no se publica.
       - run: npm run typecheck
+      - run: npm run lint
       - run: npm test
+      # Vulnerabilidades conocidas en lo que llega al navegador.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: dist
   deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.d.outputs.page_url }}
     steps:
       - id: d
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

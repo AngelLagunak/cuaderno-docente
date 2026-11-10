@@ -1,3 +1,4 @@
+import { csvCell } from '../core/io';
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
@@ -19,10 +20,9 @@ const weekStart = (date: string) => {
   return d.toISOString().slice(0, 10);
 };
 const dmy = (s: string) => s.split('-').reverse().join('/');
-const q = (x: string) => `"${x.replace(/"/g, '""')}"`;
 
 function download(name: string, rows: string[][]) {
-  const text = '\ufeff' + rows.map((r) => r.map(q).join(';')).join('\r\n');
+  const text = '\ufeff' + rows.map((r) => r.map(csvCell).join(';')).join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
   a.download = name;
@@ -31,7 +31,7 @@ function download(name: string, rows: string[][]) {
 
 export function Attendance({ subject, preset }: { subject: Subject; preset?: { date: string; slot: string } }) {
   const groups = useGroups(subject.id);
-  const [gid, setGid] = useCurrentGroupId();
+  const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [view, setView] = useState<'list' | 'sum'>('list');
   const [date, setDate] = useState(preset?.date ?? today());

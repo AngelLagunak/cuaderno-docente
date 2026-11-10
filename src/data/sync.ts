@@ -3,7 +3,7 @@ import type { Table } from 'dexie';
 import { db } from './db';
 import { callScript } from './api';
 import type { Stamp } from '../core/model';
-import { restorePlan, shouldPurge } from '../core/io';
+import { restorePlan, shouldPurge, validRecord } from '../core/io';
 import type { Backup } from '../core/io';
 
 const TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics', 'sessions', 'calendars', 'snapshots'];
@@ -31,10 +31,12 @@ export async function pendingCount() {
 export async function applyRemote(pull: Record<string, Rec[]>) {
   let n = 0;
   for (const [t, rows] of Object.entries(pull)) {
+    // Solo tablas conocidas y registros bien formados: lo que llega del servidor no se da por bueno sin mirar.
+    if (!TABLES.includes(t) || !Array.isArray(rows)) continue;
     const T = tab(t);
-    if (!T) continue;
-    const cur = await T.bulkGet(rows.map((r) => r.id));
-    const upd = rows.filter((r, i) => !cur[i] || cur[i]!.updatedAt < r.updatedAt).map((r) => { const c = { ...r }; delete c._v; return c; });
+    const ok = rows.filter(validRecord) as Rec[];
+    const cur = await T.bulkGet(ok.map((r) => r.id));
+    const upd = ok.filter((r, i) => !cur[i] || cur[i]!.updatedAt < r.updatedAt).map((r) => { const c = { ...r }; delete c._v; return c; });
     if (upd.length) { await T.bulkPut(upd); n += upd.length; }
   }
   return n;

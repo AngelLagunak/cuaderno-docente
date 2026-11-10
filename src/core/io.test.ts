@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { cellValue, importChanges, parseBackup, parseCsv, planImport, restorePlan, shouldPurge } from './io';
+import { csvCell, validRecord } from './io';
 import type { Activity, Grade, Student } from './model';
 import { pa } from '../catalogs/pa';
 
@@ -91,5 +92,22 @@ describe('copias de seguridad', () => {
     const cur = { grades: [r('a', 5), r('c', 9), r('x', 1, true)] };
     const bk = { grades: [r('a', 3), r('d', 2, true)] };
     expect(restorePlan(cur, bk, 'replace', 100)).toEqual({ grades: [{ ...r('a', 100), deleted: false }, r('d', 100, true), r('c', 100, true)] });
+  });
+});
+
+describe('seguridad de datos que entran y salen', () => {
+  it('una celda de CSV nunca se ejecuta como fórmula', () => {
+    expect(csvCell('=HYPERLINK("http://x","clic")')).toBe(`"'=HYPERLINK(""http://x"",""clic"")"`);
+    expect(csvCell('+34 600')).toBe(`"'+34 600"`);
+    expect(csvCell('@ana')).toBe(`"'@ana"`);
+    expect(csvCell('-1+1')).toBe(`"'-1+1"`);
+    expect(csvCell('García, Ana')).toBe('"García, Ana"');
+    expect(csvCell(7.5)).toBe('"7,5"');
+    expect(csvCell(null)).toBe('""');
+  });
+  it('solo se aceptan registros con id de texto y fecha numérica', () => {
+    expect(validRecord({ id: 'a', updatedAt: 3 })).toBe(true);
+    for (const bad of [null, 'x', {}, { id: 3, updatedAt: 1 }, { id: '', updatedAt: 1 }, { id: 'a' }, { id: 'a', updatedAt: 'ayer' }, { id: 'a', updatedAt: NaN }]) expect(validRecord(bad)).toBe(false);
+    expect(parseBackup(JSON.stringify({ tables: { students: [{ id: 'a', updatedAt: 1 }, { id: 'b' }, null], raro: null } })).tables).toEqual({ students: [{ id: 'a', updatedAt: 1 }], raro: [] });
   });
 });

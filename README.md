@@ -65,6 +65,8 @@ En los dos casos, lo que aún no se ha evaluado no cuenta como cero. La nota fin
 
 ## Privacidad
 
+El detalle está en [SECURITY.md](SECURITY.md).
+
 - El repositorio es público y solo tiene el código. Nunca subas datos del alumnado ni tu token.
 - Los datos viven en el navegador (IndexedDB) y en un archivo `cuaderno-docente-db.json` de tu Drive. Nadie más tiene acceso.
 - El token protege tu Apps Script. Si lo compartes por error, ejecuta `generarToken` de nuevo y pégalo en la app.
@@ -74,8 +76,7 @@ En los dos casos, lo que aún no se ha evaluado no cuenta como cero. La nota fin
 ```bash
 npm ci
 npm run dev        # servidor local
-npm run typecheck
-npm test           # tests del motor de cálculo (vitest)
+npm run check      # tipos + linter + tests (lo mismo que se exige antes de publicar)
 npm run build
 ```
 

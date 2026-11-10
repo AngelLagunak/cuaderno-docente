@@ -67,6 +67,9 @@ function useClassroom(): [ClsInfo, boolean, () => void] {
   return [info, busy, () => setTick((t) => t + 1)];
 }
 
+/** Enlace externo solo si es https (lo que llega de fuera no se usa como enlace sin comprobarlo). */
+const httpsUrl = (u: unknown) => (typeof u === 'string' && /^https:\/\//i.test(u) ? u : undefined);
+
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 
 const DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -365,7 +368,7 @@ function ClassroomAlerts(p: {
           <summary>Comentarios · {info.comments.filter((c) => c.unread).length} sin leer</summary>
           <div className="list">
             {info.comments.map((c) => (
-              <a key={c.id} className="li" href={c.link} target="_blank" rel="noreferrer">
+              <a key={c.id} className="li" href={httpsUrl(c.link)} target="_blank" rel="noopener noreferrer">
                 <span><b className={c.unread ? '' : 'mute'}>{c.subject}</b><span className="mute">{shortDate(c.time)} · {c.snippet.slice(0, 140)}</span></span>
                 <Icon name="chev" size={18} />
               </a>
@@ -380,7 +383,7 @@ function ClassroomAlerts(p: {
             {info.posts.map((x) => {
               const g = p.groups.find((y) => y.id === x.groupId)!;
               return (
-                <a key={x.id} className="li" href={x.link} target="_blank" rel="noreferrer">
+                <a key={x.id} className="li" href={httpsUrl(x.link)} target="_blank" rel="noopener noreferrer">
                   <span><b>{who(g, x.userId)} · {g.name}</b><span className="mute">{shortDate(x.time)} · {x.text.slice(0, 140)}</span></span>
                   <Icon name="chev" size={18} />
                 </a>

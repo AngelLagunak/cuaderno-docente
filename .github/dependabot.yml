@@ -1,0 +1,17 @@
+# Avisos y propuestas de actualización de dependencias y de las acciones de GitHub.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      desarrollo:
+        dependency-type: development
+      app:
+        dependency-type: production
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

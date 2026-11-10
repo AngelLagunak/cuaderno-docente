@@ -114,7 +114,7 @@ export function Settings() {
         <input className="full" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec" />
       </label>
       <label>Token
-        <input className="full" type="password" value={token} onChange={(e) => setToken(e.target.value)} />
+        <input className="full" type="password" autoComplete="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} />
       </label>
       <button onClick={ping}>Probar conexión</button>
       {result && <pre>{result}</pre>}

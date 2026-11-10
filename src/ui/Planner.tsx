@@ -280,7 +280,7 @@ function WorkImport(p: { subject: Subject; group: Group; groups: Group[]; all: A
 export function Planner({ subject, onProgress }: { subject: Subject; onProgress?: () => void }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
-  const [gid, setGid] = useCurrentGroupId();
+  const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const unitsRaw = useLiveQuery(() => db.units.where('subjectId').equals(subject.id).toArray(), [subject.id]);
   const actsRaw = useLiveQuery(() => db.activities.where('subjectId').equals(subject.id).toArray(), [subject.id]);

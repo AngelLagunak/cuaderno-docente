@@ -105,7 +105,7 @@ export function teacherReport(p: TrInput): TrGroup[] {
     const absenceWarn = students.filter((st) => !st.lec && absenceSummary(s, rows, st.id, g.planned).warn).map((x) => `${x.firstName} ${x.lastName}`);
     const sign = new Map((s.config.observations ?? []).map((o) => [o.id, o.sign]));
     const obs = { pos: 0, neg: 0 };
-    for (const r of rowsIn) for (const o of r.obs ?? []) sign.get(o) === 1 ? obs.pos++ : sign.get(o) === -1 && obs.neg++;
+    for (const r of rowsIn) for (const o of r.obs ?? []) { if (sign.get(o) === 1) obs.pos++; else if (sign.get(o) === -1) obs.neg++; }
 
     // Sesiones
     const held = g.sessions.filter((x) => !x.deleted && x.date <= p.today && inRange(x.date));

@@ -92,7 +92,7 @@ export function parseCurriculum(text: string): ParsedCurriculum {
   const a = text.indexOf('{'), b = text.lastIndexOf('}');
   if (a < 0 || b < a) throw new Error('No encuentro un JSON en la respuesta.');
   let j: Record<string, unknown>;
-  try { j = obj(JSON.parse(text.slice(a, b + 1))); } catch (e) { throw new Error('El JSON no es válido: ' + (e as Error).message); }
+  try { j = obj(JSON.parse(text.slice(a, b + 1))); } catch (e) { throw new Error('El JSON no es válido: ' + (e as Error).message, { cause: e }); }
   const ces = arr(j.competencias).map(obj).map((c) => ({
     code: str(c.codigo), text: str(c.texto),
     desc: arr(c.descriptores).map(str).filter(Boolean),

@@ -22,7 +22,7 @@ export function Comms({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
-  const [gid, setGid] = useCurrentGroupId();
+  const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const tplRaw = useLiveQuery(() => db.templates.toArray());
   const templates = useMemo(() => (tplRaw ?? []).filter((t) => !t.deleted), [tplRaw]);

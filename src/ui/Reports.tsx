@@ -18,7 +18,7 @@ const COLORS = ['#2d4a7a', '#e08a1e', '#2e7d4f', '#9c3d8f', '#b54708'];
 export function Reports({ subject }: { subject: Subject }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
-  const [gid, setGid] = useCurrentGroupId();
+  const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [view, setView] = useState<'student' | 'group'>('student');
   const [sid, setSid] = useState('');

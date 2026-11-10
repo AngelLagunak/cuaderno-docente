@@ -4,7 +4,7 @@ export type CellIn = string | number | boolean | Date | null | undefined;
 
 /** Lee un CSV (separador «;», «,» o tabulador, con comillas). Quita el BOM. */
 export function parseCsv(text: string): string[][] {
-  const t = text.replace(/^﻿/, '');
+  const t = text.replace(/^\uFEFF/, '');
   const first = t.split(/\r?\n/, 1)[0] ?? '';
   const sep = [';', '\t', ','].map((s) => [s, first.split(s).length] as const).sort((a, b) => b[1] - a[1])[0][0];
   const rows: string[][] = [];
@@ -123,12 +123,26 @@ type Row = Stamp & { id: string };
 export interface Backup { exportedAt: string | null; tables: Record<string, Row[]> }
 
 /** Lee una copia: la exportación de la app o el db.json de Drive (tablas como objetos id → registro). */
+/** Registro con la forma mínima que espera la app: id de texto y fecha de cambio numérica. */
+export const validRecord = (r: unknown): r is Row =>
+  !!r && typeof r === 'object' && typeof (r as Row).id === 'string' && (r as Row).id !== '' && Number.isFinite((r as Row).updatedAt);
+
+/**
+ * Celda de texto para un CSV: entre comillas y sin que una hoja de cálculo la ejecute como fórmula (un nombre o un
+ * comentario que empiece por «=», «+», «-» o «@» se guarda como texto).
+ */
+export function csvCell(x: string | number | null | undefined): string {
+  if (typeof x === 'number') return `"${String(x).replace('.', ',')}"`;
+  const s = x ?? '';
+  return `"${(/^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
+}
+
 export function parseBackup(text: string): Backup {
   let j: { app?: string; exportedAt?: string; tables?: Record<string, Row[] | Record<string, Row>> };
   try { j = JSON.parse(text); } catch { throw new Error('El archivo no es una copia de la app (JSON no válido).'); }
   if (!j || typeof j !== 'object' || !j.tables || typeof j.tables !== 'object') throw new Error('El archivo no es una copia de la app.');
   const tables: Record<string, Row[]> = {};
-  for (const [t, v] of Object.entries(j.tables)) tables[t] = (Array.isArray(v) ? v : Object.values(v)).filter((r) => r && typeof r.id === 'string').map((r) => { const c = { ...r } as Row & { _v?: number }; delete c._v; return c; });
+  for (const [t, v] of Object.entries(j.tables)) tables[t] = (Array.isArray(v) ? v : Object.values(v ?? {})).filter(validRecord).map((r) => { const c = { ...r } as Row & { _v?: number }; delete c._v; return c; });
   return { exportedAt: j.exportedAt ?? null, tables };
 }
 

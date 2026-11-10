@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, seed } from './data/db';
 import { purgeDeleted, startAutoSync, syncNow, useSyncStatus } from './data/sync';
@@ -9,7 +9,6 @@ import { Curriculum } from './ui/Curriculum';
 import { Groups } from './ui/Groups';
 import { Notebook } from './ui/Notebook';
 import { Planner } from './ui/Planner';
-import { Reports } from './ui/Reports';
 import { Settings } from './ui/Settings';
 import { SchoolCalendar } from './ui/SchoolCalendar';
 import { NewSubject } from './ui/NewSubject';
@@ -19,6 +18,9 @@ import { Programacion } from './ui/Programacion';
 import { Icon } from './ui/icons';
 import type { IconName } from './ui/icons';
 import { setCurrentGroup, useCurrentGroupId } from './ui/hooks';
+
+// Informes carga las gráficas (lo más pesado de la app): solo se descarga al abrirlo.
+const Reports = lazy(() => import('./ui/Reports').then((m) => ({ default: m.Reports })));
 
 type View = 'hoy' | 'notes' | 'plan' | 'seg' | 'more' | 'att' | 'groups' | 'rep' | 'comm' | 'curr' | 'config' | 'cal' | 'conn' | 'new' | 'pd';
 
@@ -171,7 +173,7 @@ export function App() {
         {subject && view === 'att' && <Attendance key={subject.id + JSON.stringify(attPreset ?? '')} subject={subject} preset={attPreset} />}
         {subject && view === 'seg' && <Progress key={subject.id} subject={subject} />}
         {subject && view === 'comm' && <Comms key={subject.id} subject={subject} />}
-        {subject && view === 'rep' && <Reports key={subject.id} subject={subject} />}
+        {subject && view === 'rep' && <Suspense fallback={<p className="mute">Cargando…</p>}><Reports key={subject.id} subject={subject} /></Suspense>}
         {subject && view === 'groups' && <Groups key={subject.id} subject={subject} />}
         {subject && view === 'plan' && <Planner key={subject.id} subject={subject} onProgress={() => go('seg')} />}
         {subject && view === 'curr' && <Curriculum key={subject.id} subject={subject} />}

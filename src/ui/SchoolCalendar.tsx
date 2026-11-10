@@ -45,7 +45,7 @@ function GroupRow({ g, subject, cal }: { g: Group; subject?: Subject; cal: Cal }
         <td className="sum">{p?.total ?? '—'}</td>
         {sc.own || sc.mismatch
           ? <td className="sum" colSpan={cal.terms.length}>{sc.own ? sc.terms.map((t, i) => `${t.name.replace(' evaluación', '')}: ${p?.byTerm[i] ?? '—'}`).join(' · ') : <span className="warn">Pon las fechas de sus evaluaciones en Evaluación y configuración</span>}</td>
-          : cal.terms.map((t, i) => <td className="sum" key={i}>{p?.byTerm[i] ?? '—'}</td>)}
+          : cal.terms.map((_t, i) => <td className="sum" key={i}>{p?.byTerm[i] ?? '—'}</td>)}
         <td><button className="small" onClick={() => setOpen(!open)}>{open ? 'Cerrar' : 'Horario'}</button></td>
       </tr>
       {open && (

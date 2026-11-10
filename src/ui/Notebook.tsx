@@ -1,3 +1,4 @@
+import { csvCell } from '../core/io';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { ImportGrades } from './ImportGrades';
 import { SigadExport } from './SigadExport';
@@ -75,7 +76,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
     ? nodes.filter((n) => n.level === gl).map((n) => ({ id: n.id, name: n.code, title: n.title }))
     : subject.instruments.map((i) => ({ id: i.id, name: i.name.slice(0, 10), title: `${i.name} (${i.weight} %)` }));
   const [items, setItems] = useState(true);
-  const [gid, setGid] = useCurrentGroupId();
+  const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const planned = usePlannedSessions(group, subject);
   const atRaw = useLiveQuery(() => (group ? db.attendance.where('groupId').equals(group.id).toArray() : []), [group?.id]);
@@ -141,8 +142,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
     a.click();
   }
   function exportCsv() {
-    const q = (x: string | number | null) => `"${(typeof x === 'number' ? String(x).replace('.', ',') : x ?? '').replace(/"/g, '""')}"`;
-    const csv = gradeTable().map((r) => r.map(q).join(';')).join('\r\n');
+    const csv = gradeTable().map((r) => r.map(csvCell).join(';')).join('\r\n');
     download(`notas-${group?.name ?? 'grupo'}.csv`, new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
   }
   async function exportXlsx() {

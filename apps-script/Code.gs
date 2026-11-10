@@ -1,13 +1,46 @@
 // Cuaderno docente · Apps Script · ping, Classroom (tareas, notas y rúbricas), correo, tablón y sincronización
 
+// Seguridad: la aplicación web es pública (cualquiera puede llamar a la URL), así que TODA petición debe traer el
+// token secreto. Sin él no se ejecuta nada ni se da información. Las entradas se validan antes de usarlas.
+
+var MAX_BODY = 5 * 1024 * 1024; // 5 MB por petición
+var MAX_MAILS = 60;             // correos por petición (un grupo grande)
+var TABLES = ['subjects', 'nodes', 'links', 'groups', 'students', 'activities', 'grades', 'units', 'attendance', 'messages', 'templates', 'rubrics', 'sessions', 'calendars', 'snapshots'];
+var BAD_KEYS = { '__proto__': 1, 'constructor': 1, 'prototype': 1 };
+
+/** Compara dos textos sin revelar por el tiempo de respuesta cuántos caracteres coinciden. */
+function sameToken_(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  var d = 0;
+  for (var i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+/** Identificador de Classroom o de la app: texto corto sin caracteres raros. */
+function id_(v, name) {
+  var s = String(v === undefined || v === null ? '' : v);
+  if (!/^[A-Za-z0-9_.:|\/-]{1,200}$/.test(s)) throw new Error('Dato no válido: ' + name);
+  return s;
+}
+
+function doGet() {
+  return json_({ ok: false, error: '405' });
+}
+
 function doPost(e) {
   var out;
   try {
-    var req = JSON.parse(e.postData.contents);
+    var raw = e && e.postData && e.postData.contents;
+    if (typeof raw !== 'string' || raw.length > MAX_BODY) return json_({ ok: false, error: '400' });
+    var req;
+    try { req = JSON.parse(raw); } catch (bad) { return json_({ ok: false, error: '400' }); }
     var token = PropertiesService.getScriptProperties().getProperty('TOKEN');
-    if (!token || req.token !== token) {
+    if (!token || !req || !sameToken_(req.token, token)) {
       return json_({ ok: false, error: '403' });
     }
+    if (req.courseId !== undefined) req.courseId = id_(req.courseId, 'curso');
+    if (req.courseWorkId !== undefined) req.courseWorkId = id_(req.courseWorkId, 'tarea');
+    if (req.days !== undefined) req.days = Math.min(60, Math.max(1, Math.floor(Number(req.days)) || 14));
     switch (req.action) {
       case 'ping':
         out = { ok: true, data: { pong: true, user: Session.getEffectiveUser().getEmail(), time: new Date().toISOString() } };
@@ -219,8 +252,12 @@ function grades_(courseId, workId) {
 
 // Crea una tarea como borrador (para añadirle la rúbrica en Classroom antes de publicarla).
 function workCreate_(req) {
-  var body = { title: req.title, description: req.description || '', workType: 'ASSIGNMENT', state: 'DRAFT', maxPoints: req.maxPoints || 10 };
+  var title = String(req.title || '').trim().slice(0, 3000);
+  if (!title) throw new Error('La tarea necesita un título.');
+  var pts = Number(req.maxPoints);
+  var body = { title: title, description: String(req.description || '').slice(0, 30000), workType: 'ASSIGNMENT', state: 'DRAFT', maxPoints: pts > 0 && pts <= 1000 ? pts : 10 };
   if (req.dueDate) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(req.dueDate))) throw new Error('Dato no válido: fecha');
     var p = String(req.dueDate).split('-');
     body.dueDate = { year: Number(p[0]), month: Number(p[1]), day: Number(p[2]) };
     body.dueTime = { hours: 21, minutes: 59 }; // UTC: 23:59 en verano, 22:59 en invierno (Madrid)
@@ -235,9 +272,10 @@ function gradesPush_(req) {
   var byUser = {};
   all_(base + '?pageSize=100', 'studentSubmissions').forEach(function (s) { byUser[s.userId] = s.id; });
   var updated = 0, errors = [];
-  (req.grades || []).forEach(function (g) {
-    var id = byUser[g.userId];
+  (Array.isArray(req.grades) ? req.grades : []).forEach(function (g) {
+    var id = g && Object.prototype.hasOwnProperty.call(byUser, g.userId) ? byUser[g.userId] : null;
     if (!id) { errors.push('sin entrega (¿tarea sin publicar?)'); return; }
+    if (typeof g.grade !== 'number' || !isFinite(g.grade) || g.grade < 0) { errors.push('nota no válida'); return; }
     try { api_(base + '/' + enc_(id) + '?updateMask=draftGrade', 'patch', { draftGrade: g.grade }); updated++; }
     catch (e) { errors.push(String(e.message || e)); }
   });
@@ -245,10 +283,12 @@ function gradesPush_(req) {
 }
 
 function announce_(req) {
-  var body = { text: req.text, state: 'PUBLISHED' };
+  var text = String(req.text || '').slice(0, 30000);
+  if (!text.trim()) throw new Error('El anuncio está vacío.');
+  var body = { text: text, state: 'PUBLISHED' };
   if (req.studentIds && req.studentIds.length) {
     body.assigneeMode = 'INDIVIDUAL_STUDENTS';
-    body.individualStudentsOptions = { studentIds: req.studentIds };
+    body.individualStudentsOptions = { studentIds: req.studentIds.map(function (x) { return id_(x, 'alumno'); }) };
   } else {
     body.assigneeMode = 'ALL_STUDENTS';
   }
@@ -259,10 +299,17 @@ function announce_(req) {
 // ---------- Correo ----------
 
 function mail_(messages) {
-  messages = messages || [];
+  if (!Array.isArray(messages)) throw new Error('Dato no válido: mensajes');
+  if (messages.length > MAX_MAILS) throw new Error('Demasiados correos en un envío (máximo ' + MAX_MAILS + ').');
   var left = MailApp.getRemainingDailyQuota();
   if (messages.length > left) throw new Error('Cuota diaria insuficiente: quedan ' + left + ' envíos.');
-  messages.forEach(function (m) {
+  // Se valida todo antes de enviar nada: un destinatario por mensaje, sin saltos de línea en el asunto.
+  var clean = messages.map(function (m) {
+    var to = String((m && m.to) || '').trim();
+    if (!/^[^\s@<>,;:"']+@[^\s@<>,;:"']+\.[^\s@<>,;:"']+$/.test(to) || to.length > 254) throw new Error('Dirección de correo no válida.');
+    return { to: to, subject: String(m.subject || '').replace(/[\r\n]+/g, ' ').slice(0, 250), body: String(m.body || '').slice(0, 20000) };
+  });
+  clean.forEach(function (m) {
     MailApp.sendEmail({ to: m.to, subject: m.subject, body: m.body, name: 'Cuaderno docente' });
   });
   return { sent: messages.length, remaining: MailApp.getRemainingDailyQuota() };
@@ -296,9 +343,12 @@ function sync_(req) {
     var since = Number(req.since) || 0, push = req.push || {}, accepted = {}, changed = false;
     var v = db.version + 1;
     Object.keys(push).forEach(function (t) {
+      // Solo las tablas de la app y registros con forma válida (id de texto y fecha numérica).
+      if (TABLES.indexOf(t) < 0 || !Array.isArray(push[t])) return;
       var tab = db.tables[t] = db.tables[t] || {};
       push[t].forEach(function (r) {
-        var cur = tab[r.id];
+        if (!r || typeof r.id !== 'string' || !r.id || r.id.length > 400 || BAD_KEYS[r.id] || typeof r.updatedAt !== 'number' || !isFinite(r.updatedAt)) return;
+        var cur = Object.prototype.hasOwnProperty.call(tab, r.id) ? tab[r.id] : null;
         if (!cur || cur.updatedAt < r.updatedAt) { r._v = v; tab[r.id] = r; accepted[t + '|' + r.id] = 1; changed = true; }
       });
     });

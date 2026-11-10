@@ -37,7 +37,7 @@ export function Progress({ subject }: { subject: Subject }) {
 
   const pr = sessionProgress({ units: d.units, sessions: d.sessions, attendance: d.attendance, today, terms: subject.terms,
     calendarTerms: cal?.terms, timetable: group.timetable, holidays: parseHolidays((cal?.holidays ?? '') + '\n' + (group.holidays ?? '')) });
-  const nowTerm = pr.terms.find((t, i) => { const r = cal?.terms[i]; return r?.start && r.end && today >= r.start && today <= r.end; }) ?? pr.terms.find((t) => t.gap != null);
+  const nowTerm = pr.terms.find((_t, i) => { const r = cal?.terms[i]; return r?.start && r.end && today >= r.start && today <= r.end; }) ?? pr.terms.find((t) => t.gap != null);
   const gap = nowTerm?.gap ?? null;
 
   const idx = indexGrades(d.grades);

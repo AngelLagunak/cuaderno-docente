@@ -108,7 +108,7 @@ export function SessionNotes({ groupId, date, slot }: { groupId: string; date: s
  * Generar sesiones desde el horario semanal y repartir las unidades según sus sesiones previstas.
  */
 export function Calendar({ subject, groups, units, acts }: { subject: Subject; groups: Group[]; units: LearningUnit[]; acts: Activity[] }) {
-  const [gid, setGid] = useCurrentGroupId();
+  const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [week, setWeek] = useState(monday(ymd(new Date())));
   const [gen, setGen] = useState(false);

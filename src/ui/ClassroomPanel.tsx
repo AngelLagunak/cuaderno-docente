@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { db, saveActivity, undoable } from '../data/db';
+import { saveActivity, undoable } from '../data/db';
 import { callScript } from '../data/api';
 import { describe, remapRubric } from '../data/classroomSync';
 import type { PullResult } from '../data/classroomSync';

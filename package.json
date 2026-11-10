@@ -16,7 +16,7 @@
     "@xyflow/react": "12.11.6",
     "dexie": "^4.0.8",
     "dexie-react-hooks": "^1.1.7",
-    "react": "^18.3.1",
+    "react": "^19.3.1",
     "react-dom": "^18.3.1",
     "read-excel-file": "9.3.10",
     "recharts": "^2.15.4",
@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/react": "^18.3.3",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.3.0",
     "eslint": "^10.14.0",

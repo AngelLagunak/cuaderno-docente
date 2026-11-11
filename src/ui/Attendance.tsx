@@ -2,7 +2,8 @@ import { csvCell } from '../core/io';
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
-import { useCurrentGroupId, useGroups, usePlannedSessions } from './hooks';
+import { useCurrentGroupId, useGroups, usePlannedSessions, useSchoolCalendar } from './hooks';
+import { weekday } from '../core/planning';
 import { SessionNotes } from './Calendar';
 import { defaultObservations } from '../core/model';
 import type { AttStatus, Attendance as Att, Student, Subject } from '../core/model';
@@ -40,6 +41,7 @@ export function Attendance({ subject, preset }: { subject: Subject; preset?: { d
   const [to, setTo] = useState('');
   const planned = usePlannedSessions(group, subject);
   const [showObs, setShowObs] = useState(true);
+  const cal = useSchoolCalendar(group?.schoolYear);
 
   const stRaw = useLiveQuery(() => (group ? db.students.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const students = (stRaw ?? []).filter((s) => !s.deleted).sort((a, b) => (a.lastName + a.firstName).localeCompare(b.lastName + b.firstName, 'es'));
@@ -96,6 +98,17 @@ export function Attendance({ subject, preset }: { subject: Subject; preset?: { d
   // Resumen
   const inRange = recs.filter((r) => (!from || r.date >= from) && (!to || r.date <= to));
   const sessions = [...new Set(inRange.map((r) => `${r.date}|${r.slot}`))].sort();
+  // Horas que se ofrecen: las del horario del grupo ese día; si no hay, las de lista ya pasada ese día; si no, 1.ª–7.ª.
+  const byNum = (a: string, b: string) => a.localeCompare(b, 'es', { numeric: true });
+  const wd = weekday(date);
+  const fromTimetable = (group?.timetable ?? []).filter((t) => t.weekday === wd).map((t) => t.slot);
+  const heldThatDay = recs.filter((r) => r.date === date).map((r) => r.slot);
+  const offered = fromTimetable.length ? fromTimetable : heldThatDay.length ? heldThatDay : ['1', '2', '3', '4', '5', '6', '7'];
+  const slotOptions = [...new Set([...offered, slot])].sort(byNum);
+  const slotLabel = (s: string) => {
+    const t = cal?.slots?.find((x) => x.slot === s);
+    return `${s}.ª hora${t?.start && t.end ? ` · ${t.start}–${t.end}` : ''}`;
+  };
   const warnPct = subject.config.absenceWarnPct ?? 20;
   const annual = subject.config.annualSessions ?? 0;
   const yearBase = annual > 0 ? annual : planned ?? 0;
@@ -142,7 +155,9 @@ export function Attendance({ subject, preset }: { subject: Subject; preset?: { d
         <div className="card">
           <div className="row">
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            <label>Hora <input className="num" style={{ width: 60 }} value={slot} onChange={(e) => setSlot(e.target.value.trim() || '1')} /></label>
+            <label>Hora <select aria-label="Hora" value={slot} onChange={(e) => setSlot(e.target.value)}>
+              {slotOptions.map((s) => <option key={s} value={s}>{slotLabel(s)}</option>)}
+            </select></label>
             {!sessionHeld && <button className="on" onClick={markAll}>Todos presentes</button>}
             {sessionHeld && <button className="small" onClick={delSession}>Borrar sesión</button>}
             <label><input type="checkbox" checked={showObs} onChange={(e) => setShowObs(e.target.checked)} /> Observaciones</label>

@@ -15,6 +15,7 @@ import { configured } from '../data/sync';
 import { applyPending, describe, pullActivity, pullGroup } from '../data/classroomSync';
 import type { PullResult } from '../data/classroomSync';
 import { PushGrades, RubricMap } from './ClassroomPanel';
+import { AdaptBadge } from './Groups';
 import { useBackStep, useCurrentGroupId, useGroups, useNodes, usePlannedSessions } from './hooks';
 import { activityBase, activityValue, indexGrades, profile, itemGrades, noGrades, round, termResult, wmean } from '../core/evaluation';
 import type { Num, StudentGrades } from '../core/evaluation';
@@ -63,7 +64,7 @@ function ItemRow({ s, a, node, g, rubric, onRecover }: { s: Student; a: Activity
   );
 }
 
-export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; focusAct?: string; onProgress?: () => void }) {
+export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject: Subject; focusAct?: string; onProgress?: () => void; onStudent?: (studentId: string) => void }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const rbRaw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
@@ -296,6 +297,9 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
         </div>
       )}
 
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'one' && stu && act.rubric && (
+        <RubricMap key={'r' + act.id + (act.updatedAt ?? 0)} subject={subject} act={act} nodes={nodes} links={curr.links} onResult={(r) => finish(r, ' con el nuevo emparejamiento')} />
+      )}
       {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'one' && stu && (
         <div className="gradeLayout">
           <div className="tw sideTable">
@@ -314,7 +318,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
           </div>
           <StudentGrader subject={subject} act={act} acts={acts} student={stu} sg={sgOf(stu)} items={actItems(act)} rubric={rubricOf(act)} curr={curr}
             pos={act.formative ? `${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · sin calificación` : `${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · ${actItems(act).filter((n) => sgOf(stu).byItem.get(act.id)?.get(n.id)?.value != null).length} de ${actItems(act).length} criterios`}
-            onPrev={() => setStuIdx((stuIdx - 1 + students.length) % students.length)} onNext={() => setStuIdx((stuIdx + 1) % students.length)} />
+            onStudent={onStudent && (() => onStudent(stu.id))} onPrev={() => setStuIdx((stuIdx - 1 + students.length) % students.length)} onNext={() => setStuIdx((stuIdx + 1) % students.length)} />
         </div>
       )}
 
@@ -334,7 +338,7 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
                 const r = termResult(subject, acts, sgOf(s), term.id, curr);
                 return (
                   <tr key={s.id}>
-                    <td title={`${s.lastName}, ${s.firstName}`}><StudentName s={s} /></td>
+                    <td title={`${s.lastName}, ${s.firstName}: ver su ficha`}><button className="linkish stuname" onClick={() => onStudent?.(s.id)}><StudentName s={s} /></button><AdaptBadge s={s} /></td>
                     {termActs.map((a) => <td key={a.id}>{a.formative ? <CommentMark g={sgOf(s).byActivity.get(a.id)} onOpen={() => openAct(a, s)} /> : <><ActCell sg={sgOf(s)} s={s} a={a} /><LateBtn s={s} a={a} /></>}</td>)}
                     {r.parts.map((i) => <td key={i.id} className={'sum' + (cfg.minPerInstrument && i.value != null && i.value < cfg.passMark ? ' warn' : '')}>{fmt(round(i.value, cfg.termDecimals), cfg.termDecimals)}</td>)}
                     <td className="sum" title={r.coverage < 1 ? `Provisional: ${Math.round(r.coverage * 100)} % de ${partLabel} con datos` : ''}>
@@ -372,14 +376,14 @@ export function Notebook({ subject, focusAct, onProgress }: { subject: Subject; 
             </div>
           )}
           {act.fromObs && <ObsPanel subject={subject} group={group} act={act} students={students} att={(atRaw ?? []).filter((r) => !r.deleted)} sgOf={sgOf} onMsg={setMsg} />}
-          {act.rubric && <RubricMap key={act.id + (act.updatedAt ?? 0)} subject={subject} act={act} nodes={nodes} onResult={(r) => finish(r, ' con el nuevo emparejamiento')} />}
+          {act.rubric && <RubricMap key={act.id + (act.updatedAt ?? 0)} subject={subject} act={act} nodes={nodes} links={curr.links} onResult={(r) => finish(r, ' con el nuevo emparejamiento')} />}
           {students.map((s) => {
             const g = sgOf(s).byActivity.get(act.id);
             const its = items ? actItems(act) : [];
             return (
               <div key={s.id}>
                 <div className="issue sp" style={{ alignItems: 'center' }}>
-                  <span style={{ flex: 1 }}>{s.lastName}, {s.firstName}</span>
+                  <span style={{ flex: 1 }}>{s.lastName}, {s.firstName}<AdaptBadge s={s} />{act.adaptations?.[s.id] && <span className="mute sub">Adaptación: {act.adaptations[s.id]}</span>}</span>
                   <input className="cell" style={{ width: act.formative ? 220 : 140 }} placeholder="Comentario" defaultValue={g?.comment ?? ''} key={'c' + (g?.updatedAt ?? 0)}
                     onBlur={(e) => e.target.value !== (g?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />
                   {!act.formative && <span><ActCell sg={sgOf(s)} s={s} a={act} /><LateBtn s={s} a={act} /></span>}

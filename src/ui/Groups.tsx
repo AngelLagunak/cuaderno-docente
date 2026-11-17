@@ -19,13 +19,19 @@ export function parseStudents(text: string): Row[] {
     .map((c) => ({ lastName: c[0] ?? '', firstName: c[1] ?? '', email: c[2] || undefined, nia: c[3] || undefined }));
 }
 
+/** Marca de adaptación curricular junto al nombre: AC no significativa / ACS significativa. */
+export function AdaptBadge({ s }: { s: Student }) {
+  if (!s.adaptation) return null;
+  return <span className={'acbadge' + (s.adaptation === 's' ? ' sig' : '')} title={(s.adaptation === 's' ? 'Adaptación curricular significativa' : 'Adaptación curricular no significativa') + (s.adaptationNote ? `: ${s.adaptationNote}` : '')}>{s.adaptation === 's' ? 'ACS' : 'AC'}</span>;
+}
+
 function StudentRow({ s }: { s: Student }) {
   const [edit, setEdit] = useState(false);
   const [d, setD] = useState(s);
   if (!edit)
     return (
       <div className="issue sp">
-        <span><b>{s.lastName}</b>, {s.firstName}<span className="mute sub">{[s.nia, s.email].filter(Boolean).join(' · ')}</span></span>
+        <span><b>{s.lastName}</b>, {s.firstName}{s.adaptation && <AdaptBadge s={s} />}<span className="mute sub">{[s.nia, s.email].filter(Boolean).join(' · ')}</span></span>
         <span className="row" style={{ margin: 0 }}>
           <button className="small" onClick={() => { setD(s); setEdit(true); }}>Editar</button>
           <button className="small" onClick={() => confirm(`¿Borrar a ${s.firstName} ${s.lastName}?`) && softDelete(db.students, s)}>×</button>
@@ -38,6 +44,14 @@ function StudentRow({ s }: { s: Student }) {
       <input placeholder="Nombre" value={d.firstName} onChange={(e) => setD({ ...d, firstName: e.target.value })} />
       <input placeholder="Correo" value={d.email ?? ''} onChange={(e) => setD({ ...d, email: e.target.value || undefined })} />
       <input placeholder="NIA" value={d.nia ?? ''} onChange={(e) => setD({ ...d, nia: e.target.value || undefined })} />
+      <label>Adaptación curricular
+        <select value={d.adaptation ?? ''} onChange={(e) => setD({ ...d, adaptation: (e.target.value || undefined) as Student['adaptation'] })}>
+          <option value="">Sin adaptación</option>
+          <option value="ns">No significativa (acceso, metodología, tiempos)</option>
+          <option value="s">Significativa (otros criterios u objetivos)</option>
+        </select>
+      </label>
+      {d.adaptation && <textarea rows={2} placeholder="Qué se adapta (se ve al calificar)" value={d.adaptationNote ?? ''} onChange={(e) => setD({ ...d, adaptationNote: e.target.value || undefined })} />}
       <div className="row">
         <button className="on" onClick={async () => { await db.students.put({ ...d, updatedAt: Date.now() }); setEdit(false); }}>Guardar</button>
         <button onClick={() => setEdit(false)}>Cancelar</button>

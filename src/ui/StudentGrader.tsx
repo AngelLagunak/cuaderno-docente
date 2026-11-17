@@ -4,6 +4,7 @@ import type { Curr, StudentGrades } from '../core/evaluation';
 import type { Activity, CNode, Rubric, Student, Subject } from '../core/model';
 import { Cell, fmt, raw } from './cells';
 import { Icon } from './icons';
+import { AdaptBadge } from './Groups';
 
 /**
  * Calificar a un alumno en una actividad: un toque por criterio (niveles de la rúbrica) o la nota numérica, y debajo
@@ -11,7 +12,7 @@ import { Icon } from './icons';
  */
 export function StudentGrader(p: {
   subject: Subject; act: Activity; acts: Activity[]; student: Student; pos: string; sg: StudentGrades; items: CNode[]; rubric?: Rubric; curr: Curr;
-  onPrev: () => void; onNext: () => void;
+  onPrev: () => void; onNext: () => void; onStudent?: () => void;
 }) {
   const { subject, act, student: s, sg, rubric } = p;
   const overall = sg.byActivity.get(act.id);
@@ -28,10 +29,17 @@ export function StudentGrader(p: {
     <section className="card grader" aria-label={`Calificar a ${s.firstName} ${s.lastName}`}>
       <div className="stunav">
         <button aria-label="Alumno anterior" onClick={p.onPrev}><Icon name="left" /></button>
-        <div><b>{s.firstName} {s.lastName}</b><span className="mute">{p.pos}</span></div>
+        <div><b>{p.onStudent ? <button className="linkish" title="Ver su ficha" onClick={p.onStudent}>{s.firstName} {s.lastName}</button> : `${s.firstName} ${s.lastName}`}</b><AdaptBadge s={s} /><span className="mute">{p.pos}</span></div>
         <button aria-label="Alumno siguiente" onClick={p.onNext}><Icon name="right" /></button>
       </div>
 
+      {s.adaptation && (
+        <div className="adaptnote">
+          <b>{s.adaptation === 's' ? 'Adaptación significativa' : 'Adaptación no significativa'}</b>
+          {act.adaptations?.[s.id] && <div>En esta actividad: {act.adaptations[s.id]}</div>}
+          {s.adaptationNote && <div className="mute">General: {s.adaptationNote}</div>}
+        </div>
+      )}
       {act.formative ? (
         <p className="ink2">Actividad sin calificación: no cuenta en la nota ni en las competencias. Si quieres, deja constancia del comentario que le has dado.</p>
       ) : p.items.length === 0 ? (
@@ -74,6 +82,17 @@ export function StudentGrader(p: {
         </div>
         <div className="sp total"><span>{term?.name} de {s.firstName}</span><b>{fmt(r.value, subject.config.termDecimals)}</b></div>
       </div>}
+
+      {act.rubric && overall?.rubric?.length ? (
+        <div className="clsrub">
+          <b>Rúbrica en Classroom</b>
+          {act.rubric.criteria.map((c) => {
+            const rg = overall.rubric!.find((x) => x.criterionId === c.id);
+            const lv = c.levels.find((l) => l.id === rg?.levelId);
+            return <div key={c.id} className="sp"><span className="ink2">{c.title || 'Fila'}</span><span>{lv?.title || '—'} <span className="mute">({rg?.points ?? '—'} pts)</span></span></div>;
+          })}
+        </div>
+      ) : null}
 
       <textarea rows={2} placeholder={`Comentario para ${s.firstName}`} defaultValue={overall?.comment ?? ''} key={'c' + s.id + (overall?.updatedAt ?? 0)}
         onBlur={(e) => e.target.value !== (overall?.comment ?? '') && saveGrade(s.id, act.id, { comment: e.target.value || undefined })} />

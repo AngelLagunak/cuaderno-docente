@@ -4,7 +4,7 @@ import { db, saveSubject } from '../data/db';
 import { teacherReport } from '../core/teacherReport';
 import type { TrGroupInput } from '../core/teacherReport';
 import { round } from '../core/evaluation';
-import { plannedSessions, ymd } from '../core/planning';
+import { effectiveSessions, plannedSessions, ymd } from '../core/planning';
 import type { Subject } from '../core/model';
 import { useGroups, useNodes, useSubjectCalendar } from './hooks';
 import { fmt } from './cells';
@@ -38,7 +38,7 @@ export function TeacherReport({ subject }: { subject: Subject }) {
       ]);
       const live = activities.filter((a) => !a.deleted);
       const grades = live.length ? await db.grades.where('activityId').anyOf(live.map((a) => a.id)).toArray() : [];
-      return { group, students, activities: live, grades, attendance, sessions, planned: plannedSessions(cal, group.timetable ?? [], group.holidays)?.total };
+      return { group, students, activities: live, grades, attendance, sessions: effectiveSessions(sessions, live), planned: plannedSessions(cal, group.timetable ?? [], group.holidays)?.total };
     }));
     return { links, units, per };
   }, [subject.id, groups, cal]);

@@ -1,9 +1,9 @@
 import { db, saveActivity, saveGrade, saveItemGrade } from './db';
 import { callScript } from './api';
 import type { CGrades } from './api';
-import { autoMap, classify, pointsValue, rubricItems } from '../core/classroom';
+import { autoMap, classify, mappedNodes, pointsValue, rubricItems } from '../core/classroom';
 import type { Incoming } from '../core/classroom';
-import { gradedLevels } from '../core/curriculum';
+import { assessableNodes, gradedLevels } from '../core/curriculum';
 import { indexGrades, noGrades } from '../core/evaluation';
 import type { Activity, Group, Subject } from '../core/model';
 
@@ -28,8 +28,10 @@ export async function pullActivity(subject: Subject, act: Activity, group: Group
   let a: Activity = { ...act, maxPoints: r.maxPoints ?? act.maxPoints };
   if (r.rubric) {
     const nodes = (await db.nodes.where('subjectId').equals(subject.id).toArray()).filter((n) => !n.deleted);
-    const map = autoMap(r.rubric, nodes, gradedLevels(subject), act.classroomRubricMap ?? {});
-    a = { ...a, rubric: r.rubric, classroomRubricMap: map, nodeIds: [...new Set([...a.nodeIds, ...Object.values(map)])] };
+    // Solo se emparejan solas las filas con código de una concreción (o de un criterio sin concreciones).
+    const links = (await db.links.where('subjectId').equals(subject.id).toArray()).filter((l) => !l.deleted);
+    const map = autoMap(r.rubric, assessableNodes(subject, nodes, links), gradedLevels(subject), act.classroomRubricMap ?? {});
+    a = { ...a, rubric: r.rubric, classroomRubricMap: map, nodeIds: [...new Set([...a.nodeIds, ...mappedNodes(map)])] };
   } else if (r.rubricError) res.notes.push(`Rúbrica no disponible: ${r.rubricError}`);
   if (JSON.stringify(a) !== JSON.stringify(act)) await saveActivity(a);
 

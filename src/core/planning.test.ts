@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { distribute, holidayItems, monday, parseCalendarText, parseHolidays, plannedSessions, previousPending, subjectCalendar, schoolDays, schoolYearOf, unitBalance, weekday } from './planning';
-import type { LearningUnit, Session } from './model';
+import { distribute, holidayItems, monday, parseCalendarText, parseHolidays, plannedSessions, previousPending, subjectCalendar, sessionActivities, effectiveSessions, schoolDays, schoolYearOf, unitBalance, weekday } from './planning';
+import type { Activity, LearningUnit, Session } from './model';
 
 describe('fechas', () => {
   it('día de la semana y lunes', () => {
@@ -110,5 +110,30 @@ describe('calendario de cada materia', () => {
     const p = plannedSessions(c, [{ weekday: 1, slot: '1' }])!;
     expect(p.byTerm[0]! + p.byTerm[1]!).toBe(p.total);
     expect(schoolDays('2026-10-12', '2026-10-12', [{ weekday: 1, slot: '1' }], parseHolidays(c.holidays))).toEqual([]);
+  });
+});
+
+describe('actividad de cada sesión', () => {
+  const ses = (id: string, date: string, slot: string, activityId?: string, unitId?: string): Session => ({ id, groupId: 'g', date, slot, topic: '', activityId, unitId, updatedAt: 0 });
+  const act = (id: string, p: Partial<Activity> = {}): Activity => ({ id, subjectId: 's', groupId: 'g', termId: 't1', instrumentId: 'i', title: id, weight: 1, nodeIds: [], updatedAt: 0, ...p });
+  const acts = [act('cartel', { from: '2026-10-05', to: '2026-10-16', unitId: 'u1' }), act('boceto', { from: '2026-10-12', to: '2026-10-13', unitId: 'u2' }), act('libre', { unitId: 'u3' })];
+  it('elegida, continuación de la hora seguida y rango de fechas (el más corto gana)', () => {
+    const s = [
+      ses('a', '2026-10-06', '1'), // rango: cartel
+      ses('b', '2026-10-06', '3', 'libre'), // elegida
+      ses('c', '2026-10-06', '4'), // seguida de b: libre
+      ses('d', '2026-10-12', '2'), // cartel y boceto: boceto (más corto)
+      ses('e', '2026-10-20', '1'), // fuera de rango
+    ];
+    const m = sessionActivities(s, acts);
+    expect(['a', 'b', 'c', 'd', 'e'].map((id) => m.get(id)?.id)).toEqual(['cartel', 'libre', 'libre', 'boceto', undefined]);
+  });
+  it('una hora no seguida no hereda', () => {
+    const m = sessionActivities([ses('a', '2026-10-20', '1', 'libre'), ses('b', '2026-10-20', '3')], acts);
+    expect(m.get('b')).toBeUndefined();
+  });
+  it('la unidad de la sesión sale de su actividad', () => {
+    const e = effectiveSessions([ses('a', '2026-10-06', '1', undefined, 'u9'), ses('z', '2026-10-30', '1', undefined, 'u9')], acts);
+    expect(e.map((x) => [x.activityId, x.unitId])).toEqual([['cartel', 'u1'], [undefined, 'u9']]);
   });
 });

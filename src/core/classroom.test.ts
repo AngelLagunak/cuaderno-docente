@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { autoMap, classify, pointsValue, rubricItems, rubricValue } from './classroom';
-import { gradedLevels } from './curriculum';
+import { assessableNodes, gradedLevels } from './curriculum';
 import { indexGrades, noGrades } from './evaluation';
 import type { Activity, Grade, RubricDef } from './model';
 import { pa } from '../catalogs/pa';
@@ -19,15 +19,15 @@ const rubric: RubricDef = {
 
 describe('autoMap', () => {
   it('empareja filas cuyo título empieza por el código de un criterio o concreción', () => {
-    expect(autoMap(rubric, pa.nodes, gradedLevels(pa.subject))).toEqual({ c1: 'pa-1bach/crit:3.2', c2: 'pa-1bach/ind:1.1.3' });
+    expect(autoMap(rubric, pa.nodes, gradedLevels(pa.subject))).toEqual({ c1: ['pa-1bach/crit:3.2'], c2: ['pa-1bach/ind:1.1.3'] });
   });
   it('respeta lo ya emparejado a mano', () => {
-    expect(autoMap(rubric, pa.nodes, gradedLevels(pa.subject), { c1: 'pa-1bach/crit:4.2', c3: 'pa-1bach/crit:5.4' }))
-      .toEqual({ c1: 'pa-1bach/crit:4.2', c2: 'pa-1bach/ind:1.1.3', c3: 'pa-1bach/crit:5.4' });
+    expect(autoMap(rubric, pa.nodes, gradedLevels(pa.subject), { c1: 'pa-1bach/crit:4.2', c3: ['pa-1bach/crit:5.4', 'pa-1bach/crit:5.3'] }))
+      .toEqual({ c1: ['pa-1bach/crit:4.2'], c2: ['pa-1bach/ind:1.1.3'], c3: ['pa-1bach/crit:5.4', 'pa-1bach/crit:5.3'] });
   });
   it('funciona con los aspectos de Modelado (UD1.2)', () => {
     const r: RubricDef = { id: 'r', criteria: [{ id: 'x', title: 'UD1.2 Moldes sin oclusiones', levels: lv([0, 3]) }] };
-    expect(autoMap(r, mm.nodes, gradedLevels(mm.subject))).toEqual({ x: 'mm-2joy/aspecto:UD1.2' });
+    expect(autoMap(r, mm.nodes, gradedLevels(mm.subject))).toEqual({ x: ['mm-2joy/aspecto:UD1.2'] });
   });
 });
 
@@ -75,5 +75,27 @@ describe('rubricItems', () => {
   });
   it('sin rúbrica o sin emparejar, nada', () => {
     expect(rubricItems({ ...a, classroomRubricMap: undefined }, ['s'], sgOf)).toEqual([]);
+  });
+});
+
+describe('rúbrica de Classroom con varias concreciones por fila', () => {
+  it('una fila alimenta varias concreciones y una concreción hace la media de sus filas', () => {
+    const a: Activity = {
+      id: 'a', subjectId: 'pa-1bach', groupId: 'g', termId: 't1', instrumentId: 'proy', title: '', weight: 1, nodeIds: [], rubric,
+      classroomRubricMap: { c1: ['n1', 'n2'], c2: 'n2' }, updatedAt: 0,
+    };
+    const sg = indexGrades([{ id: 's|a', studentId: 's', activityId: 'a', value: 7, updatedAt: 0,
+      rubric: [{ criterionId: 'c1', levelId: 'l3', points: 4 }, { criterionId: 'c2', levelId: 'l1', points: 5 }] }]).get('s')!;
+    expect(rubricItems(a, ['s'], () => sg)).toEqual([{ studentId: 's', nodeId: 'n1', value: 10 }, { studentId: 's', nodeId: 'n2', value: 7.5 }]);
+  });
+});
+
+describe('concreciones evaluables', () => {
+  it('son las concreciones y los criterios sin concreciones', () => {
+    const ids = assessableNodes(pa.subject, pa.nodes, pa.links).map((n) => n.code);
+    expect(ids).toContain('1.1.1');
+    expect(ids).not.toContain('1.1');
+    expect(ids).toContain('3.2');
+    expect(ids.every((c) => !c.startsWith('CE'))).toBe(true);
   });
 });

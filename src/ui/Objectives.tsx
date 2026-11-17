@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, saveSubject, setLink } from '../data/db';
+import { db, saveNode, saveSubject } from '../data/db';
+import { KEY_COMPETENCES, keyCompetence } from '../catalogs/descriptors';
 import { objectivesPrompt, objectivesRecords, parseObjectives } from '../core/subjects';
 import type { CLink, CNode, Subject } from '../core/model';
 
@@ -29,7 +30,7 @@ function AddObjectives({ subject, nodes }: { subject: Subject; nodes: CNode[] })
       {others && others.length > 0 && (
         <div className="row">
           <span className="mute">Copiar de:</span>
-          {others.map(({ s, items: xs }) => <button key={s.id} className="small" onClick={() => add(xs.map((n) => ({ code: n.code, text: n.title })))}>{s.name} ({xs.length})</button>)}
+          {others.map(({ s, items: xs }) => <button key={s.id} className="small" onClick={() => add(xs.map((n) => ({ code: n.code, text: n.title, keyComps: n.keyComps })))}>{s.name} ({xs.length})</button>)}
         </div>
       )}
       <p className="mute">O pega la lista del BOA (una línea por objetivo: «a) …»). Si no la tienes a mano, copia este prompt en una IA:</p>
@@ -46,28 +47,38 @@ function AddObjectives({ subject, nodes }: { subject: Subject; nodes: CNode[] })
 }
 
 /**
- * Objetivos de etapa: el texto de cada uno y las competencias específicas de la materia que contribuyen a él
- * (un toque en cada competencia lo vincula o lo desvincula). No se evalúan.
+ * Objetivos de etapa y las competencias clave con las que se vinculan (perfil de salida). La materia contribuye a un
+ * objetivo a través de sus competencias específicas: las que tienen descriptores de esas competencias clave.
  */
 export function Objectives({ subject, nodes, links }: { subject: Subject; nodes: CNode[]; links: CLink[] }) {
-  const rel = subject.relations.find((r) => r.to === 'obj');
   const objs = nodes.filter((n) => n.level === 'obj');
-  const from = rel ? nodes.filter((n) => n.level === rel.from) : [];
-  const on = (o: CNode, c: CNode) => links.some((l) => !l.deleted && l.relation === rel?.key && l.fromId === c.id && l.toId === o.id);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const ces = nodes.filter((n) => n.level === 'ce');
+  // Competencias clave de cada competencia específica, a través de sus descriptores.
+  const kcOf = (ce: CNode) => new Set(links.filter((l) => !l.deleted && l.fromId === ce.id).map((l) => byId.get(l.toId)).filter((d): d is CNode => d?.level === 'desc').map((d) => d.group ?? keyCompetence(d.code)));
+  const toggle = (o: CNode, k: string) => {
+    const cur = o.keyComps ?? [];
+    saveNode({ ...o, keyComps: cur.includes(k) ? cur.filter((x) => x !== k) : [...cur, k] });
+  };
   if (!objs.length) return <div className="card"><b>Objetivos de etapa</b><AddObjectives subject={subject} nodes={nodes} /></div>;
   return (
     <div>
-      <p className="mute">Marca qué {subject.levels.find((l) => l.key === rel?.from)?.plural.toLowerCase() ?? 'elementos'} contribuyen a cada objetivo. No cuentan para la nota.</p>
-      {objs.map((o) => (
-        <div className="card" key={o.id}>
-          <p><b>{o.code})</b> {o.title}</p>
-          <div className="chips">
-            {from.map((c) => (
-              <button key={c.id} title={c.title} className={'chip obs' + (on(o, c) ? ' pos' : '')} aria-pressed={on(o, c)} onClick={() => rel && setLink(subject.id, rel.key, c.id, o.id, !on(o, c))}>{c.code}</button>
-            ))}
+      <p className="mute">Marca las competencias clave con las que se vincula cada objetivo. La materia contribuye a través de las competencias específicas que tienen descriptores de esas competencias clave. No cuentan para la nota.</p>
+      {objs.map((o) => {
+        const kc = o.keyComps ?? [];
+        const via = ces.filter((c) => kc.some((k) => kcOf(c).has(k)));
+        return (
+          <div className="card" key={o.id}>
+            <p><b>{o.code})</b> {o.title}</p>
+            <div className="chips">
+              {KEY_COMPETENCES.map(([k, name]) => (
+                <button key={k} title={name} className={'chip obs' + (kc.includes(k) ? ' pos' : '')} aria-pressed={kc.includes(k)} onClick={() => toggle(o, k)}>{k}</button>
+              ))}
+            </div>
+            {kc.length > 0 && <p className="mute">{via.length ? `Contribuyen: ${via.map((c) => c.code).join(', ')}` : 'Ninguna competencia específica de la materia tiene descriptores de estas competencias clave.'}</p>}
           </div>
-        </div>
-      ))}
+        );
+      })}
       <details className="card"><summary>Añadir objetivos</summary><AddObjectives subject={subject} nodes={nodes} /></details>
     </div>
   );

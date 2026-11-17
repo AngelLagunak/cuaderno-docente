@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../data/db';
 import { indexGrades, noGrades, round, termResult, activityBase } from '../core/evaluation';
 import { BUCKETS, gradeSummary, sessionProgress } from '../core/progress';
-import { parseHolidays, ymd } from '../core/planning';
+import { effectiveSessions, parseHolidays, ymd } from '../core/planning';
 import type { Subject } from '../core/model';
 import { useCurrentGroupId, useGroups, useNodes, useSubjectCalendar } from './hooks';
 import { fmt, raw } from './cells';
@@ -30,7 +30,8 @@ export function Progress({ subject }: { subject: Subject }) {
     ]);
     const acts = activities.filter((a) => !a.deleted);
     const grades = acts.length ? await db.grades.where('activityId').anyOf(acts.map((a) => a.id)).toArray() : [];
-    return { units, sessions, attendance, students: students.filter((s) => !s.deleted), acts, grades, links };
+    // Cada sesión cuenta para la unidad de su actividad (elegida, continuación o por fechas).
+    return { units, sessions: effectiveSessions(sessions, activities), attendance, students: students.filter((s) => !s.deleted), acts, grades, links };
   }, [group?.id, subject.id]);
   if (!group) return <p className="mute">Crea un grupo en Más → Grupos y alumnos.</p>;
   if (!d) return null;

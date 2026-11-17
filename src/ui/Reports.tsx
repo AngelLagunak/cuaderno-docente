@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Bar, BarChart, Legend, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { db } from '../data/db';
-import { useCurrentGroupId, useGroups, useNodes } from './hooks';
+import { useCurrentGroupId, useGroups, useNodes, usePlannedSessions } from './hooks';
 import { activityBase, finalResult, indexGrades, itemGrades, noGrades, profile, round, wmean } from '../core/evaluation';
-import { outcome, scaleLabel } from '../core/rules';
+import { absenceSummary, outcome, scaleLabel } from '../core/rules';
 import type { Num, Profile } from '../core/evaluation';
 import type { Student, Subject } from '../core/model';
 
@@ -15,13 +15,14 @@ type Axis = { id: string; axis: string; title: string; v: Num };
 type Series = { key: string; name: string; axes: Axis[] };
 const COLORS = ['#2d4a7a', '#e08a1e', '#2e7d4f', '#9c3d8f', '#b54708'];
 
-export function Reports({ subject }: { subject: Subject }) {
+export function Reports({ subject, focusStudent }: { subject: Subject; focusStudent?: string }) {
   const groups = useGroups(subject.id);
   const nodes = useNodes(subject.id);
   const [gid] = useCurrentGroupId();
   const group = groups.find((g) => g.id === gid) ?? groups[0];
   const [view, setView] = useState<'student' | 'group'>('student');
-  const [sid, setSid] = useState('');
+  const [sid, setSid] = useState(focusStudent ?? '');
+  const planned = usePlannedSessions(group, subject);
   const [periodId, setPeriodId] = useState('');
   const [axisKey, setAxisKey] = useState('');
   const [cmp, setCmp] = useState<'none' | 'group' | 'terms'>('group');
@@ -33,6 +34,7 @@ export function Reports({ subject }: { subject: Subject }) {
   const acts = useMemo(() => (acRaw ?? []).filter((a) => !a.deleted), [acRaw]);
   const key = acts.map((a) => a.id).join(',');
   const grRaw = useLiveQuery(() => (acts.length ? db.grades.where('activityId').anyOf(acts.map((a) => a.id)).toArray() : []), [key]);
+  const atRaw = useLiveQuery(() => (group ? db.attendance.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const lkRaw = useLiveQuery(() => db.links.where('subjectId').equals(subject.id).toArray(), [subject.id]);
   const links = useMemo(() => (lkRaw ?? []).filter((l) => !l.deleted), [lkRaw]);
 
@@ -152,6 +154,7 @@ export function Reports({ subject }: { subject: Subject }) {
             <div className="card">
               <h3 style={{ marginTop: 0 }}>{student.firstName} {student.lastName}</h3>
               <p className="mute">{subject.name} · {group.name} · {group.schoolYear}</p>
+              <StudentData s={student} abs={absenceSummary(subject, (atRaw ?? []).filter((r) => !r.deleted), student.id, planned)} />
               <div className="tw">
                 <table className="t">
                   <thead><tr><th>{gl ? glLabel : 'Instrumento'}</th>{subject.terms.map((t) => <th key={t.id}>{t.name}</th>)}</tr></thead>
@@ -280,6 +283,18 @@ export function Reports({ subject }: { subject: Subject }) {
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+/** Datos del alumno en su ficha: contacto, adaptación curricular y faltas. */
+function StudentData({ s, abs }: { s: Student; abs: ReturnType<typeof absenceSummary> }) {
+  return (
+    <div className="studata">
+      {s.email && <span><b>Correo</b> {s.email}</span>}
+      {s.nia && <span><b>NIA</b> {s.nia}</span>}
+      <span><b>Faltas</b> {abs.A} injustificadas ({abs.pct.toFixed(0)} %){abs.J ? ` · ${abs.J} justificadas` : ''}{abs.R ? ` · ${abs.R} retrasos` : ''}{s.lec ? ' · pérdida de evaluación continua' : ''}</span>
+      {s.adaptation && <span><b>Adaptación</b> {s.adaptation === 's' ? 'significativa' : 'no significativa'}{s.adaptationNote ? `: ${s.adaptationNote}` : ''}</span>}
     </div>
   );
 }

@@ -75,6 +75,7 @@ export function App() {
   // Lo que se abre desde Hoy: una lista concreta o una actividad para calificar.
   const [attPreset, setAttPreset] = useState<{ date: string; slot: string } | undefined>();
   const [focusAct, setFocusAct] = useState<string | undefined>();
+  const [focusStudent, setFocusStudent] = useState<string | undefined>();
   const all = useLiveQuery(() => db.subjects.toArray());
   const groupsAll = useLiveQuery(() => db.groups.toArray());
   const subjects = all?.filter((s) => !s.deleted);
@@ -87,7 +88,7 @@ export function App() {
   }, []);
 
   const subject = subjects?.find((s) => s.id === sid) ?? subjects?.[0];
-  const go = (v: View) => { setView(v); setAttPreset(undefined); setFocusAct(undefined); window.scrollTo(0, 0); };
+  const go = (v: View) => { setView(v); setAttPreset(undefined); setFocusAct(undefined); setFocusStudent(undefined); window.scrollTo(0, 0); };
   const section = view === 'seg' ? 'plan' : MAIN.some(([v]) => v === view) ? view : 'more';
 
   // Arriba: la asignatura y, en las pantallas que trabajan con alumnado, su grupo.
@@ -169,11 +170,11 @@ export function App() {
         {view === 'new' && <NewSubject subjects={subjects ?? []} onDone={(id) => { if (id) { setSid(id); go('config'); } else go('more'); }} />}
         {view === 'conn' && <Settings />}
         {view === 'cal' && <SchoolCalendar />}
-        {subject && view === 'notes' && <Notebook key={subject.id + (focusAct ?? '')} subject={subject} focusAct={focusAct} onProgress={() => go('seg')} />}
+        {subject && view === 'notes' && <Notebook key={subject.id + (focusAct ?? '')} subject={subject} focusAct={focusAct} onProgress={() => go('seg')} onStudent={(id) => { setView('rep'); setFocusStudent(id); window.scrollTo(0, 0); }} />}
         {subject && view === 'att' && <Attendance key={subject.id + JSON.stringify(attPreset ?? '')} subject={subject} preset={attPreset} />}
         {subject && view === 'seg' && <Progress key={subject.id} subject={subject} />}
         {subject && view === 'comm' && <Comms key={subject.id} subject={subject} />}
-        {subject && view === 'rep' && <Suspense fallback={<p className="mute">Cargando…</p>}><Reports key={subject.id} subject={subject} /></Suspense>}
+        {subject && view === 'rep' && <Suspense fallback={<p className="mute">Cargando…</p>}><Reports key={subject.id + (focusStudent ?? '')} subject={subject} focusStudent={focusStudent} /></Suspense>}
         {subject && view === 'groups' && <Groups key={subject.id} subject={subject} />}
         {subject && view === 'plan' && <Planner key={subject.id} subject={subject} onProgress={() => go('seg')} />}
         {subject && view === 'curr' && <Curriculum key={subject.id} subject={subject} />}

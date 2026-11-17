@@ -1,5 +1,6 @@
 import { coverage, gradedLevels, unitNodeIds } from './curriculum';
 import { aggregateTree } from './evaluation';
+import { keyCompetence } from '../catalogs/descriptors';
 import type { Activity, CLink, CNode, LearningUnit, PdInfo, Rubric, Session, Subject } from './model';
 
 export type { PdInfo };
@@ -106,7 +107,15 @@ function sectionA(d: PdData): string {
     const list = nodes.filter((n) => n.level === k && cited.has(n.id)).sort(byOrder);
     return `<h3>${esc(label(k))} vinculados</h3><table>${list.map((n) => `<tr><td>${esc(n.code)}</td><td>${esc(n.title)}</td></tr>`).join('')}</table>`;
   }).join('');
-  return out + annex;
+  // Objetivos de etapa: competencias clave vinculadas y competencias específicas de la materia que contribuyen.
+  const objs = nodes.filter((n) => n.level === 'obj').sort(byOrder);
+  const kcOf = (c: CNode) => new Set(links.filter((l) => l.fromId === c.id).map((l) => byId.get(l.toId)).filter((d): d is CNode => d?.level === 'desc').map((d) => d.group ?? keyCompetence(d.code)));
+  const objTable = objs.length ? `<h3>Contribución a los objetivos de etapa</h3><table><tr><th>Objetivo</th><th>Competencias clave</th><th>Competencias específicas</th></tr>${objs.map((o) => {
+    const kc = o.keyComps ?? [];
+    const via = comps.filter((c) => kc.some((k) => kcOf(c).has(k))).map((c) => esc(c.code));
+    return `<tr><td><b>${esc(o.code)})</b> ${esc(o.title)}</td><td>${kc.map(esc).join(', ') || '—'}</td><td>${via.join(', ') || '—'}</td></tr>`;
+  }).join('')}</table>` : '';
+  return out + annex + objTable;
 }
 
 /** Apartado b): saberes y unidades con su evaluación, sesiones, fechas, criterios y saberes. */

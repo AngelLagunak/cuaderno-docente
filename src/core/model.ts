@@ -107,6 +107,8 @@ export interface CNode extends Stamp {
   title: string;
   order: number;
   tags: string[];
+  /** Objetivos de etapa: competencias clave con las que se vinculan (CCL, CP, STEM, CD, CPSAA, CC, CE, CCEC). */
+  keyComps?: string[];
   /** Descriptores: competencia clave a la que pertenecen (CCL, STEM, CD…). */
   group?: string;
 }
@@ -134,6 +136,10 @@ export interface Student extends Stamp {
   /** Pérdida de evaluación continua (la decide el docente) y notas de la vía alternativa. */
   lec?: boolean;
   lecGrades?: { folder: number | null; exam: number | null };
+  /** Adaptación curricular: no significativa (acceso, metodología, tiempos) o significativa (otros criterios). */
+  adaptation?: 'ns' | 's';
+  /** Qué se adapta, en general (se ve al calificar). */
+  adaptationNote?: string;
   /** Notas de la convocatoria extraordinaria. */
   extra?: { projects: number | null; exam: number | null };
 }
@@ -154,7 +160,8 @@ export interface Activity extends Stamp {
   /** Rúbrica traída de Classroom (solo lectura). */
   rubric?: RubricDef;
   /** Fila de la rúbrica de Classroom → elemento curricular que mide. */
-  classroomRubricMap?: Record<string, ID>;
+  /** Fila de la rúbrica de Classroom → concreciones que mide (una o varias; antes, una sola). */
+  classroomRubricMap?: Record<string, ID | ID[]>;
   /** La tarea de Classroom la creó la app (solo en esas se pueden escribir notas). */
   classroomCreated?: boolean;
   /** Rúbrica propia de la app. */
@@ -171,7 +178,13 @@ export interface Activity extends Stamp {
    * `shareId` y mantienen iguales los campos de la programación (ver `SHARED_FIELDS`).
    */
   shareId?: ID;
+  /** Fecha de entrega. */
   date?: string;
+  /** Días en que se trabaja en clase: las sesiones de ese rango se asignan solas a esta actividad. */
+  from?: string;
+  to?: string;
+  /** Nota de la actividad para alumnado con adaptación (por alumno). Es de cada grupo, no se comparte. */
+  adaptations?: Record<ID, string>;
 }
 
 /**
@@ -215,6 +228,8 @@ export interface Session extends Stamp {
   date: string; // AAAA-MM-DD
   slot: string;
   unitId?: ID;
+  /** Actividad que se trabaja (su unidad se deduce de ella). Sin ella, la de la sesión anterior seguida o la del rango de fechas. */
+  activityId?: ID;
   topic: string;
   notes?: string;
   /** Lo que se llegó a hacer y lo que queda pendiente para la sesión siguiente. */

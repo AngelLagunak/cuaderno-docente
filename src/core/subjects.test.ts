@@ -49,7 +49,7 @@ describe('asignaturas nuevas', () => {
 });
 
 describe('objetivos de etapa', () => {
-  it('lee la lista pegada y añade nivel, relación y objetivos sin duplicar', () => {
+  it('lee la lista pegada y añade el nivel y los objetivos sin duplicar (sin relación con las competencias específicas)', () => {
     const items = parseObjectives('```\n**a)** Ejercer la ciudadanía democrática,\ndesde una perspectiva global.\nb) Consolidar una madurez personal.\n- ñ) Fomentar una actitud responsable.\n# Fuente: BOA\n```');
     expect(items).toEqual([
       { code: 'a', text: 'Ejercer la ciudadanía democrática, desde una perspectiva global.' },
@@ -58,7 +58,7 @@ describe('objetivos de etapa', () => {
     ]);
     const r = objectivesRecords(pa.subject, items, pa.nodes);
     expect(r.subject.levels[r.subject.levels.length - 1]).toMatchObject({ key: 'obj', plural: 'Objetivos de etapa' });
-    expect(r.subject.relations[r.subject.relations.length - 1]).toMatchObject({ key: 'ce-obj', from: 'ce', to: 'obj' });
+    expect(r.subject.relations.some((x) => x.to === 'obj' || x.from === 'obj')).toBe(false);
     expect(r.nodes.map((n) => n.id)).toEqual(['pa-1bach/obj:a', 'pa-1bach/obj:b', 'pa-1bach/obj:ñ']);
     const again = objectivesRecords(r.subject, items, [...pa.nodes, ...r.nodes]);
     expect(again.nodes).toEqual([]);

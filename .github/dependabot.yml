@@ -5,6 +5,17 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # TypeScript 7 aún no lo admite typescript-eslint (pide < 6.1): se actualizará cuando lo admita.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # React 19 cambia la API: es una migración aparte, no una actualización automática.
+      - dependency-name: react
+        update-types: [version-update:semver-major]
+      - dependency-name: react-dom
+        update-types: [version-update:semver-major]
+      - dependency-name: "@types/react*"
+        update-types: [version-update:semver-major]
     groups:
       desarrollo:
         dependency-type: development

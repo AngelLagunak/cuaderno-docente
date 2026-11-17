@@ -10,17 +10,27 @@ const codeOf = (title: string) => /^\s*([A-Za-z]{0,3}[\d.]*\d)(?=[\s:.)\-–]|$)
  * Empareja cada fila de una rúbrica de Classroom con un elemento calificable cuyo código aparezca al principio
  * del título de la fila. Respeta lo que ya estaba emparejado.
  */
-export function autoMap(rubric: RubricDef, nodes: CNode[], graded: Set<string>, current: Record<string, string> = {}): Record<string, string> {
+export function autoMap(rubric: RubricDef, nodes: CNode[], graded: Set<string>, current: RubricMapping = {}): Record<string, string[]> {
   const byCode = new Map(nodes.filter((n) => !n.deleted && graded.has(n.level)).map((n) => [n.code.toLowerCase(), n.id]));
-  const out = { ...current };
+  const out: Record<string, string[]> = {};
+  for (const k of Object.keys(current)) if (rowNodes(current, k).length) out[k] = rowNodes(current, k);
   for (const c of rubric.criteria) {
-    if (out[c.id]) continue;
+    if (out[c.id]?.length) continue;
     const code = codeOf(c.title)?.toLowerCase();
     const id = code ? byCode.get(code) : undefined;
-    if (id) out[c.id] = id;
+    if (id) out[c.id] = [id];
   }
   return out;
 }
+
+export type RubricMapping = Record<string, string | string[]>;
+/** Concreciones de una fila de la rúbrica (el emparejamiento antiguo guardaba una sola). */
+export const rowNodes = (map: RubricMapping | undefined, rowId: string): string[] => {
+  const v = map?.[rowId];
+  return !v ? [] : Array.isArray(v) ? v.filter(Boolean) : [v];
+};
+/** Todas las concreciones que mide la rúbrica. */
+export const mappedNodes = (map: RubricMapping | undefined): string[] => [...new Set(Object.keys(map ?? {}).flatMap((k) => rowNodes(map, k)))];
 
 /** Nota 0–10 de una fila de rúbrica: puntos obtenidos sobre el máximo de la fila. */
 export function rubricValue(c: Criterion, rg: RubricGrade): number | null {
@@ -56,13 +66,15 @@ export function rubricItems(a: Activity, students: string[], sgOf: (id: string) 
   const out: Incoming[] = [];
   for (const sid of students) {
     const raw = sgOf(sid).byActivity.get(a.id)?.rubric ?? [];
+    // Una fila puede medir varias concreciones, y una concreción puede salir de varias filas (se hace la media).
+    const acc = new Map<string, number[]>();
     for (const rg of raw) {
-      const nodeId = a.classroomRubricMap[rg.criterionId];
       const c = a.rubric.criteria.find((x) => x.id === rg.criterionId);
-      if (!nodeId || !c) continue;
-      const v = rubricValue(c, rg);
-      if (v != null) out.push({ studentId: sid, nodeId, value: v });
+      const v = c ? rubricValue(c, rg) : null;
+      if (v == null) continue;
+      for (const nodeId of rowNodes(a.classroomRubricMap, rg.criterionId)) acc.set(nodeId, [...(acc.get(nodeId) ?? []), v]);
     }
+    for (const [nodeId, vs] of acc) out.push({ studentId: sid, nodeId, value: Math.round((vs.reduce((x, y) => x + y, 0) / vs.length) * 100) / 100 });
   }
   return out;
 }

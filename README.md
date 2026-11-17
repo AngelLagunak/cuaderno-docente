@@ -8,7 +8,7 @@ Está pensado para la evaluación por competencias de la LOMLOE (currículo de A
 
 - **Hoy**: las clases del día según tu horario, con la que toca ahora. Desde aquí pasas lista y anotas lo realizado y lo pendiente. También ves lo que queda por corregir y los avisos (faltas, Classroom, copia de seguridad).
 - **Cuaderno**: notas por evaluación y nota final. Se califica alumno a alumno con un toque por criterio (rúbrica), y la nota se calcula en cascada: criterios → competencias específicas → evaluación → final.
-- **Planificar**: unidades didácticas (con sus saberes), sesiones en el calendario, actividades con sus criterios, rúbricas y cobertura del currículo. Una actividad puede ser **compartida por varios grupos** (criterios una sola vez, notas por grupo) o **sin calificación** (solo comentario).
+- **Planificar**: unidades didácticas (con sus saberes), actividades con las concreciones que evalúan y los días en que se trabajan, sesiones en el calendario (cada sesión toma la actividad de su rango de fechas o la de la hora anterior seguida), rúbricas y una **visión general** de unidades, actividades y lo que falta por trabajar del currículo. Una actividad puede ser **compartida por varios grupos** o **sin calificación** (solo comentario).
 - **Seguimiento**: avance de la programación, resultados del grupo y un **informe del docente** por evaluación y curso, con puntos fuertes y áreas de mejora.
 - **Asistencia**: lista en tarjetas o en tabla (presente, ausente, retraso, justificada), observaciones del aula y aviso de faltas.
 - **Informes**: ficha de cada alumno con su perfil competencial, y vista del grupo. Se imprimen en PDF.
@@ -51,7 +51,7 @@ La app empieza vacía. La pantalla **Hoy** muestra una lista de puesta en marcha
 2. **Asignatura**: en **Más → Nueva asignatura**, parte de la plantilla LOMLOE, la de FP, una vacía o una copia de otra. Carga el currículo con la ayuda de una IA o a mano en **Currículo**.
 3. **Evaluación y configuración**: instrumentos y sus pesos, peso de cada evaluación, de qué sale la nota (competencias o instrumentos), redondeo, entregas tardías, pérdida de evaluación continua, convocatoria extraordinaria y observaciones del aula.
 4. **Grupos y alumnos**: pega una lista, importa un CSV o trae el alumnado de Classroom.
-5. **Planificar**: unidades con sus criterios, saberes y sesiones. Después, «Repartir unidades» en el calendario y las actividades de cada unidad.
+5. **Planificar**: unidades con sus saberes y sesiones previstas; actividades con sus concreciones, su unidad y los días en que se trabajan. Después, «Repartir unidades» en el calendario.
 6. Descarga una **copia de seguridad**.
 
 ## Cómo se calcula la nota

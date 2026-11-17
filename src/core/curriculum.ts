@@ -57,6 +57,12 @@ export function migrateSubject(s: Subject, catalog?: Subject): Subject | null {
     relations = relations.filter((r) => !REMOVED_RELATIONS.includes(r.key) || catalog.relations.some((c) => c.key === r.key));
     changed = true;
   }
+  // Los objetivos de etapa se vinculan con las competencias clave (perfil de salida), no con las competencias
+  // específicas: se quita la relación antigua «competencia específica → objetivo».
+  if (relations.some((r) => r.to === 'obj' || r.from === 'obj')) {
+    relations = relations.filter((r) => r.to !== 'obj' && r.from !== 'obj');
+    changed = true;
+  }
   return changed ? { ...s, levels, config, relations } : null;
 }
 
@@ -72,6 +78,19 @@ export function refreshedCatalogNodes(current: CNode[], catalog: CNode[]): CNode
 }
 
 /** Niveles que se califican (criterio, concreción, aspecto…). */
+/**
+ * Lo que se valora en una actividad: las concreciones, o el criterio si no tiene concreciones (los elementos
+ * calificables sin hijos calificables). Lo de encima (criterio, competencia, descriptor) sale en cascada.
+ */
+export function assessableNodes(subject: Subject, nodes: CNode[], links: CLink[]): CNode[] {
+  const graded = gradedLevels(subject);
+  const live = nodes.filter((n) => !n.deleted && graded.has(n.level));
+  const ids = new Set(live.map((n) => n.id));
+  const agg = new Set(subject.relations.filter((r) => r.aggregate).map((r) => r.key));
+  const hasGradedChild = new Set(links.filter((l) => !l.deleted && agg.has(l.relation) && ids.has(l.fromId)).map((l) => l.toId));
+  return live.filter((n) => !hasGradedChild.has(n.id)).sort((a, b) => a.code.localeCompare(b.code, 'es', { numeric: true }));
+}
+
 export const gradedLevels = (subject: Subject) => new Set(subject.levels.filter((l) => l.graded).map((l) => l.key));
 
 /** Actividades que no evalúan ningún elemento calificable: no aportan al perfil ni admiten nota por criterio. */

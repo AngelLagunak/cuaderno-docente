@@ -1,4 +1,4 @@
-import type { LearningUnit, Session } from './model';
+import type { Activity, LearningUnit, Session } from './model';
 
 /** Fecha AAAA-MM-DD de un Date en hora local. */
 export const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -149,4 +149,41 @@ export function subjectCalendar<C extends { start: string; end: string; holidays
   const end = own ? dated.map((t) => t.end).sort().reverse()[0] : cal!.end;
   const base = (cal ?? { holidays: '' }) as C;
   return { ...base, start, end, terms, own, mismatch: !own && !same };
+}
+
+const slotNum = (s: string) => Number.parseInt(s, 10);
+
+/**
+ * Actividad que se trabaja en cada sesión de un grupo:
+ * 1. la elegida en la sesión;
+ * 2. si no, la de la sesión anterior del mismo día, si es la hora seguida (continúa la misma actividad);
+ * 3. si no, la actividad cuyo rango de fechas incluye ese día (si hay varias, la de rango más corto).
+ */
+export function sessionActivities(sessions: Session[], activities: Activity[]): Map<string, Activity | undefined> {
+  const acts = activities.filter((a) => !a.deleted);
+  const byId = new Map(acts.map((a) => [a.id, a]));
+  const ranged = acts.filter((a) => a.from).map((a) => ({ a, from: a.from!, to: a.to || a.from! }));
+  const out = new Map<string, Activity | undefined>();
+  let prev: Session | undefined;
+  for (const s of sessions.filter((x) => !x.deleted).sort(bySessionOrder)) {
+    let a = s.activityId ? byId.get(s.activityId) : undefined;
+    if (!a && prev && prev.groupId === s.groupId && prev.date === s.date && slotNum(s.slot) === slotNum(prev.slot) + 1) a = out.get(prev.id);
+    if (!a) {
+      const hits = ranged.filter((r) => r.a.groupId === s.groupId && r.from <= s.date && s.date <= r.to);
+      const span = (r: { from: string; to: string }) => Date.parse(r.to) - Date.parse(r.from);
+      a = hits.sort((x, y) => span(x) - span(y))[0]?.a;
+    }
+    out.set(s.id, a);
+    prev = s;
+  }
+  return out;
+}
+
+/** Sesiones con su actividad y su unidad efectivas (la de la actividad manda sobre la elegida a mano). */
+export function effectiveSessions(sessions: Session[], activities: Activity[]): Session[] {
+  const m = sessionActivities(sessions, activities);
+  return sessions.map((s) => {
+    const a = m.get(s.id);
+    return a ? { ...s, activityId: a.id, unitId: a.unitId ?? s.unitId } : s;
+  });
 }

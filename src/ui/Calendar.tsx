@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, softDelete, uid } from '../data/db';
-import { addDays, bySessionOrder, distribute, holidayItems, monday, parseHolidays, previousPending, schoolDays, unitBalance, ymd } from '../core/planning';
+import { addDays, bySessionOrder, distribute, effectiveSessions, sessionActivities, holidayItems, monday, parseHolidays, previousPending, schoolDays, unitBalance, ymd } from '../core/planning';
 import { DAYS, TimetableGrid } from './Timetable';
 import { useCurrentGroupId, useSubjectCalendar } from './hooks';
 import type { Activity, Group, LearningUnit, Session, Subject } from '../core/model';
@@ -61,24 +61,39 @@ export function DonePending({ s }: { s: Session }) {
   );
 }
 
-function SessionCard({ s, units, acts, prev }: { s: Session; units: LearningUnit[]; acts: Activity[]; prev: string }) {
+/**
+ * Una sesión: se elige la actividad que se trabaja (su unidad sale de ella). Si no se elige, se ve la que le toca:
+ * la de la hora anterior seguida o la del rango de fechas de alguna actividad.
+ */
+function SessionCard({ s, eff, units, acts, groupActs, prev }: { s: Session; eff?: Activity; units: LearningUnit[]; acts: Activity[]; groupActs: Activity[]; prev: string }) {
   const save = (p: Partial<Session>) => db.sessions.update(s.id, { ...p, updatedAt: Date.now() });
   const [open, setOpen] = useState(false);
-  const u = units.find((x) => x.id === s.unitId);
+  const unitId = eff?.unitId ?? s.unitId;
+  const u = units.find((x) => x.id === unitId);
   const past = s.date <= ymd(new Date());
+  const inRange = (a: Activity) => !!a.from && a.from <= s.date && s.date <= (a.to || a.from);
+  const options = [...groupActs].sort((a, b) => Number(inRange(b)) - Number(inRange(a)) || (a.from ?? a.date ?? '').localeCompare(b.from ?? b.date ?? ''));
   return (
     <div className={'session' + (s.done ? ' done' : '')}>
       <div className="sp">
         <b>{s.slot}.ª h{s.done ? ' ✓' : ''}</b>
-        <select value={s.unitId ?? ''} onChange={(e) => save({ unitId: e.target.value || undefined })} title={u?.title}>
+        <button className="small" title="Borrar sesión" onClick={() => confirm(`¿Borrar la sesión del ${dm(s.date)} (${s.slot}.ª h)?`) && softDelete(db.sessions, s)}>×</button>
+      </div>
+      <select aria-label="Actividad" value={s.activityId ?? ''} onChange={(e) => save({ activityId: e.target.value || undefined })} title={eff?.title}>
+        <option value="">{eff ? `↳ ${eff.title}` : 'Sin actividad'}</option>
+        {options.map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
+      </select>
+      {eff && !s.activityId && <div className="mute small">{s.date && eff.from && inRange(eff) ? 'Por fechas de la actividad' : 'Continúa la hora anterior'}{u ? ` · ${u.code}` : ''}</div>}
+      {eff && s.activityId && u && <div className="mute small">{u.code} {u.title}</div>}
+      {!eff && (
+        <select aria-label="Unidad" value={s.unitId ?? ''} onChange={(e) => save({ unitId: e.target.value || undefined })} title={u?.title}>
           <option value="">Sin unidad</option>
           {units.map((x) => <option key={x.id} value={x.id}>{x.code}</option>)}
         </select>
-        <button className="small" title="Borrar sesión" onClick={() => confirm(`¿Borrar la sesión del ${dm(s.date)} (${s.slot}.ª h)?`) && softDelete(db.sessions, s)}>×</button>
-      </div>
+      )}
       {prev && <div className="pend" title="Pendiente de la sesión anterior">⤷ {prev}</div>}
       <input placeholder="Tema / qué se hace" defaultValue={s.topic} key={'t' + s.updatedAt} onBlur={(e) => e.target.value !== s.topic && save({ topic: e.target.value })} />
-      {acts.length > 0 && <div className="chips">{acts.map((a) => <span className="chip" key={a.id} title="Actividad con esta fecha">{a.title}</span>)}</div>}
+      {acts.length > 0 && <div className="chips">{acts.map((a) => <span className="chip" key={a.id} title="Entrega ese día">Entrega: {a.title}</span>)}</div>}
       {(open || s.done || s.pending) ? <DonePending s={s} /> : past && <button className="small" onClick={() => setOpen(true)}>Realizado / pendiente</button>}
     </div>
   );
@@ -88,13 +103,15 @@ function SessionCard({ s, units, acts, prev }: { s: Session; units: LearningUnit
 export function SessionNotes({ groupId, date, slot }: { groupId: string; date: string; slot: string }) {
   const all = useLiveQuery(() => db.sessions.where('groupId').equals(groupId).toArray(), [groupId]);
   const units = useLiveQuery(() => db.units.toArray());
+  const acts = useLiveQuery(() => db.activities.where('groupId').equals(groupId).toArray(), [groupId]);
   const s = all?.find((x) => !x.deleted && x.date === date && x.slot === slot);
   if (!s) return null;
-  const u = units?.find((x) => x.id === s.unitId);
+  const a = sessionActivities(all ?? [], acts ?? []).get(s.id);
+  const u = units?.find((x) => x.id === (a?.unitId ?? s.unitId));
   const prev = previousPending(all ?? [], s);
   return (
     <details className="card" open={!!prev || !!s.topic}>
-      <summary>Sesión planificada: {[u?.code, s.topic].filter(Boolean).join(' · ') || 'sin tema'}</summary>
+      <summary>Sesión planificada: {[a?.title, u?.code, s.topic].filter(Boolean).join(' · ') || 'sin tema'}</summary>
       <div className="form">
         {prev && <div className="pend">⤷ Pendiente de la sesión anterior: {prev}</div>}
         <DonePending s={s} />
@@ -115,14 +132,17 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
   const [msg, setMsg] = useState('');
   const raw = useLiveQuery(() => (group ? db.sessions.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const sessions = (raw ?? []).filter((s) => !s.deleted).sort(bySessionOrder);
+  // Actividad y unidad efectivas de cada sesión (elegida, continuación de la hora anterior o por fechas).
+  const effMap = sessionActivities(sessions, acts.filter((a) => a.groupId === group?.id));
+  const effSessions = effectiveSessions(sessions, acts.filter((a) => a.groupId === group?.id));
   if (!group) return <p className="mute">Crea un grupo en la pestaña Grupos.</p>;
   const gActs = acts.filter((a) => a.groupId === group.id && !a.deleted);
   const days = DAYS.map((d, i) => ({ name: d, date: addDays(week, i) }));
-  const bal = unitBalance(units, sessions);
+  const bal = unitBalance(units, effSessions);
   const next = sessions.find((s) => s.date >= ymd(new Date()));
 
   async function spread() {
-    const m = distribute(sessions, units);
+    const m = distribute(effSessions, units);
     if (!m.size) return setMsg('No hay sesiones libres o las unidades ya tienen todas sus sesiones.');
     if (!confirm(`Se asignará unidad a ${m.size} sesiones sin unidad, por orden (${units.map((u) => `${u.code}: ${u.plannedSessions}`).join(', ')}). ¿Continuar?`)) return;
     const now = Date.now();
@@ -157,7 +177,7 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
           return (
             <div className={'day' + (d.date === ymd(new Date()) ? ' today' : '')} key={d.date}>
               <div className="sp"><b>{d.name} {dm(d.date)}</b><button className="small" onClick={() => add(d.date)}>+</button></div>
-              {list.map((s) => <SessionCard key={s.id} s={s} units={units} acts={dayActs} prev={previousPending(sessions, s)} />)}
+              {list.map((s) => <SessionCard key={s.id} s={s} eff={effMap.get(s.id)} units={units} acts={dayActs} groupActs={gActs} prev={previousPending(sessions, s)} />)}
               {!list.length && dayActs.map((a) => <span className="chip" key={a.id}>{a.title}</span>)}
             </div>
           );
@@ -165,9 +185,9 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
       </div>
       {units.length > 0 && (
         <details className="card">
-          <summary>Sesiones por unidad ({sessions.length} sesiones · {sessions.filter((s) => !s.unitId).length} sin unidad)</summary>
+          <summary>Sesiones por unidad ({sessions.length} sesiones · {effSessions.filter((s) => !s.unitId).length} sin unidad)</summary>
           {bal.map(({ unit, planned, scheduled }) => {
-            const ses = sessions.filter((s) => s.unitId === unit.id);
+            const ses = effSessions.filter((s) => s.unitId === unit.id);
             return (
               <div className="issue" key={unit.id}>
                 <b>{unit.code}</b>

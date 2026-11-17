@@ -40,5 +40,17 @@ export const DESCRIPTORS: Record<string, string> = {
   'CCEC4.2': 'Planifica, adapta y organiza sus conocimientos, destrezas y actitudes para responder con creatividad y eficacia a los desempeños derivados de una producción cultural o artística, individual o colectiva, utilizando diversos lenguajes, códigos, técnicas, herramientas y recursos plásticos, visuales, audiovisuales, musicales, corporales o escénicos, valorando tanto el proceso como el producto final y comprendiendo las oportunidades personales, sociales, inclusivas y económicas que ofrecen.',
 };
 
+/** Las ocho competencias clave del perfil de salida (LOMLOE). */
+export const KEY_COMPETENCES: [string, string][] = [
+  ['CCL', 'Competencia en comunicación lingüística'],
+  ['CP', 'Competencia plurilingüe'],
+  ['STEM', 'Competencia matemática y competencia en ciencia, tecnología e ingeniería'],
+  ['CD', 'Competencia digital'],
+  ['CPSAA', 'Competencia personal, social y de aprender a aprender'],
+  ['CC', 'Competencia ciudadana'],
+  ['CE', 'Competencia emprendedora'],
+  ['CCEC', 'Competencia en conciencia y expresión culturales'],
+];
+
 /** Competencia clave de un descriptor: CCL1 → CCL, CPSAA3.1 → CPSAA. */
 export const keyCompetence = (code: string) => /^[A-Z]+/.exec(code)?.[0] ?? code;

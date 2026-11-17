@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, saveSubject } from '../data/db';
 import { PD_SECTIONS, defaultNorm, parsePdTexts, pdBase, pdDocument, pdHtml, pdIssues, pdPrompt } from '../core/pd';
 import type { PdData } from '../core/pd';
-import { plannedSessions } from '../core/planning';
+import { effectiveSessions, plannedSessions } from '../core/planning';
 import type { PdInfo, Subject } from '../core/model';
 import { useCurrentGroupId, useGroups, useNodes, useSubjectCalendar } from './hooks';
 
@@ -29,7 +29,7 @@ export function Programacion({ subject }: { subject: Subject }) {
       db.activities.where('subjectId').equals(subject.id).toArray(), db.rubrics.where('subjectId').equals(subject.id).toArray(),
       group ? db.sessions.where('groupId').equals(group.id).toArray() : Promise.resolve([]),
     ]);
-    return { links, units, activities, rubrics, sessions };
+    return { links, units, activities, rubrics, sessions: effectiveSessions(sessions, activities.filter((a) => a.groupId === group?.id)) };
   }, [subject.id, group?.id]);
 
   // Guardado automático (medio segundo después de escribir).

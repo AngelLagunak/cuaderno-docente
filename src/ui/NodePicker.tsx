@@ -2,12 +2,14 @@ import { useState } from 'react';
 import type { CNode, Subject } from '../core/model';
 
 /** Elegir elementos del currículo. `levels` limita los niveles que se pueden elegir (p. ej. solo saberes). */
-export function NodePicker(p: { subject: Subject; nodes: CNode[]; selected: string[]; onChange: (ids: string[]) => void; levels?: string[] }) {
-  const levels = p.subject.levels.filter((l) => !p.levels || p.levels.includes(l.key));
-  const [lv, setLv] = useState(levels.find((l) => l.graded)?.key ?? levels[0]?.key ?? '');
+export function NodePicker(p: { subject: Subject; nodes: CNode[]; selected: string[]; onChange: (ids: string[]) => void; levels?: string[]; only?: Set<string> }) {
+  const ok = (n: CNode) => !p.only || p.only.has(n.id);
+  const levels = p.subject.levels.filter((l) => (!p.levels || p.levels.includes(l.key)) && p.nodes.some((n) => n.level === l.key && ok(n)));
+  // Con filtro (concreciones), se abre en el último nivel calificable: el más concreto.
+  const [lv, setLv] = useState((p.only ? [...levels].reverse() : levels).find((l) => l.graded)?.key ?? levels[0]?.key ?? '');
   const [q, setQ] = useState('');
   const byId = new Map(p.nodes.map((n) => [n.id, n]));
-  const list = p.nodes.filter((n) => n.level === lv && (!q || (n.code + ' ' + n.title).toLowerCase().includes(q.toLowerCase())));
+  const list = p.nodes.filter((n) => n.level === lv && ok(n) && (!q || (n.code + ' ' + n.title).toLowerCase().includes(q.toLowerCase())));
   const toggle = (id: string, on: boolean) => p.onChange(on ? [...p.selected, id] : p.selected.filter((x) => x !== id));
   return (
     <div>

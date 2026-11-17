@@ -6,9 +6,11 @@ import { useCurrentGroupId, useGroups, useNodes } from './hooks';
 import { NodePicker } from './NodePicker';
 import { Rubrics } from './Rubrics';
 import { Calendar } from './Calendar';
+import { Overview } from './Overview';
+import { AdaptBadge } from './Groups';
 import { callScript } from '../data/api';
 import type { CWork } from '../data/api';
-import { activitiesWithoutItems, coverage, gradedLevels, unitNodeIds } from '../core/curriculum';
+import { activitiesWithoutItems, assessableNodes, coverage, gradedLevels, unitNodeIds } from '../core/curriculum';
 import type { Activity, CNode, Group, LearningUnit, Rubric, Subject } from '../core/model';
 
 /** Niveles de contenidos (saberes básicos): no se evalúan ni tienen relaciones; se eligen en cada unidad. */
@@ -102,7 +104,7 @@ function ClassroomLink(p: { a: Activity; group?: Group; others: Activity[]; node
   );
 }
 
-function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; groups: Group[]; all: Activity[]; others: Activity[]; init: Activity; onDone: () => void }) {
+function ActForm(p: { subject: Subject; nodes: CNode[]; assessable: Set<string>; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; groups: Group[]; all: Activity[]; others: Activity[]; init: Activity; onDone: () => void }) {
   const [a, setA] = useState(p.init);
   const [w, setW] = useState(String(p.init.weight));
   const [pick, setPick] = useState(false);
@@ -116,6 +118,14 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
   // Actividades iguales (mismo título) ya creadas en otros grupos: se pueden unir a esta.
   const twin = (gid: string) => isNew ? undefined : matchWork(a.title, p.all.filter((x) => x.groupId === gid && !x.deleted && (!a.shareId || x.shareId !== a.shareId)));
   const [join, setJoin] = useState<string[]>([]);
+  // Alumnado con adaptación curricular del grupo: nota de la actividad para cada uno.
+  const adapted = (useLiveQuery(() => (p.group ? db.students.where('groupId').equals(p.group.id).toArray() : []), [p.group?.id]) ?? [])
+    .filter((s) => !s.deleted && s.adaptation).sort((x, y) => x.lastName.localeCompare(y.lastName, 'es'));
+  const setAdapt = (sid: string, text: string) => {
+    const next = { ...a.adaptations };
+    if (text.trim()) next[sid] = text; else delete next[sid];
+    setA({ ...a, adaptations: Object.keys(next).length ? next : undefined });
+  };
   return (
     <div className="card form">
       <input placeholder="Título de la actividad" value={a.title} onChange={(e) => setA({ ...a, title: e.target.value })} />
@@ -129,21 +139,37 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; units: LearningUnit[]; r
       </div>
       <div className="row">
         <label>Peso <input className="num" type="number" min={0} step="0.5" value={w} onChange={(e) => setW(e.target.value)} /></label>
-        <input type="date" value={a.date ?? ''} onChange={(e) => setA({ ...a, date: e.target.value || undefined })} />
+        <label>Entrega <input type="date" value={a.date ?? ''} onChange={(e) => setA({ ...a, date: e.target.value || undefined })} /></label>
         <select value={a.unitId ?? ''} onChange={(e) => setA({ ...a, unitId: e.target.value || undefined })}>
           <option value="">Sin unidad</option>
           {p.units.map((u) => <option key={u.id} value={u.id}>{u.code}</option>)}
         </select>
       </div>
+      <div className="row">
+        <label>Se trabaja del <input type="date" value={a.from ?? ''} onChange={(e) => setA({ ...a, from: e.target.value || undefined, to: a.to && e.target.value > a.to ? e.target.value : a.to })} /></label>
+        <label>al <input type="date" value={a.to ?? ''} min={a.from} onChange={(e) => setA({ ...a, to: e.target.value || undefined })} /></label>
+      </div>
+      {a.from && <p className="mute">Las sesiones de esos días quedan asignadas a esta actividad (y a su unidad) sin marcarlas una a una.</p>}
       <select value={a.rubricId ?? ''} onChange={(e) => setA({ ...a, rubricId: e.target.value || undefined })}>
         <option value="">Sin rúbrica (nota numérica)</option>
         {p.rubrics.map((r) => <option key={r.id} value={r.id}>Rúbrica: {r.name}</option>)}
       </select>
       <label><input type="checkbox" checked={!!a.formative} onChange={(e) => setA({ ...a, formative: e.target.checked || undefined, fromObs: e.target.checked ? undefined : a.fromObs })} /> Sin calificación (evaluación formativa: solo comentario al alumno; no cuenta en la nota ni avisa de notas pendientes)</label>
       {!a.formative && <label><input type="checkbox" checked={!!a.fromObs} onChange={(e) => setA({ ...a, fromObs: e.target.checked || undefined })} /> Nota desde las observaciones del aula (participación, material… marcadas en Asistencia)</label>}
-      <button className="small" onClick={() => setPick(!pick)}>Criterios que evalúa ({a.nodeIds.length})</button>
-      {pick && <NodePicker subject={p.subject} nodes={p.nodes} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
+      <button className="small" onClick={() => setPick(!pick)}>Concreciones que evalúa ({a.nodeIds.length})</button>
+      {pick && <NodePicker subject={p.subject} nodes={p.nodes} only={p.assessable} selected={a.nodeIds} onChange={(ids) => setA({ ...a, nodeIds: ids })} />}
+      {pick && <p className="mute">Solo se eligen concreciones (o el criterio, si no tiene). El criterio, la competencia específica y los descriptores se calculan en cascada.</p>}
       {a.rubricId && <p className="mute">Al guardar se añaden los criterios de la rúbrica.</p>}
+      {adapted.length > 0 && (
+        <details className="groupsBox" open={!!a.adaptations}>
+          <summary><b>Adaptaciones ({Object.keys(a.adaptations ?? {}).length} de {adapted.length})</b></summary>
+          {adapted.map((s) => (
+            <label key={s.id}>{s.lastName}, {s.firstName} <AdaptBadge s={s} />
+              <textarea rows={2} placeholder={s.adaptationNote ? `General: ${s.adaptationNote}` : 'Qué cambia en esta actividad para este alumno'} value={a.adaptations?.[s.id] ?? ''} onChange={(e) => setAdapt(s.id, e.target.value)} />
+            </label>
+          ))}
+        </details>
+      )}
       {otherGroups.length > 0 && (
         <div className="groupsBox">
           <b>Grupos que hacen esta actividad</b>
@@ -299,6 +325,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
   const noItems = new Set(activitiesWithoutItems(subject, nodes, acts).map((a) => a.id));
   // Contenidos (saberes básicos): niveles no evaluables sin relaciones; se reparten en las unidades.
   const contentLevels = contentLevelsOf(subject);
+  const assessable = new Set(assessableNodes(subject, nodes, lkRaw ?? []).map((n) => n.id));
   const gradedLv = gradedLevels(subject);
   const unitCrit = (u: LearningUnit) => unitNodeIds(u, actsRaw ?? []).map((id) => byId.get(id)).filter((n): n is CNode => !!n && gradedLv.has(n.level)).sort((a, b) => a.order - b.order);
   const contents = nodes.filter((n) => contentLevels.some((l) => l.key === n.level));
@@ -315,16 +342,18 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
   const newUnit = () => setEu({ id: uid(), subjectId: subject.id, code: `UD${units.length + 1}`, title: '', termId: subject.terms[0]?.id ?? '', plannedSessions: 0, nodeIds: [], updatedAt: Date.now() });
   const newAct = () => setEa({ id: uid(), subjectId: subject.id, groupId: group!.id, termId: subject.terms[0]?.id ?? '', instrumentId: subject.instruments[0]?.id ?? '', title: '', weight: 1, nodeIds: [], updatedAt: Date.now() });
 
-  const [view, setView] = useState<'plan' | 'cal'>('plan');
+  const [view, setView] = useState<'plan' | 'cal' | 'ov'>('plan');
   const tabs = (
     <div className="row">
       <div className="seg" role="group" aria-label="Vista">
       <button className={view === 'plan' ? 'on' : ''} onClick={() => setView('plan')}>Unidades y actividades</button>
       <button className={view === 'cal' ? 'on' : ''} onClick={() => setView('cal')}>Calendario</button>
+      <button className={view === 'ov' ? 'on' : ''} onClick={() => setView('ov')}>Visión general</button>
     </div>
       {onProgress && <button className="linkish" onClick={onProgress}>Seguimiento ›</button>}
     </div>
   );
+  if (view === 'ov') return <div>{tabs}<Overview subject={subject} nodes={nodes} links={(lkRaw ?? []).filter((l) => !l.deleted)} units={units} activities={acts} groupName={group?.name} instName={instName} /></div>;
   if (view === 'cal') return <div>{tabs}<Calendar subject={subject} groups={groups} units={units} acts={actsRaw ?? []} /></div>;
 
   return (
@@ -363,7 +392,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
           </div>
           {imp && group && <WorkImport subject={subject} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} existing={acts} onDone={() => setImp(false)} />}
           {noItems.size > 0 && <p className="warn">⚠ {noItems.size === 1 ? '1 actividad' : `${noItems.size} actividades`} sin criterio: solo admiten nota global y no aportan al perfil competencial.</p>}
-          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} units={units} rubrics={rubrics} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} others={acts} init={ea} onDone={() => setEa(null)} />}
+          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} assessable={assessable} units={units} rubrics={rubrics} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} others={acts} init={ea} onDone={() => setEa(null)} />}
           {subject.terms.map((t) => {
             const list = acts.filter((a) => a.termId === t.id);
             return (
@@ -376,7 +405,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
                       <div>
                         <b>{a.title}</b>
                         <div className="mute">
-                          {instName(a.instrumentId)} · peso {a.weight}{a.date ? ` · ${a.date}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}{a.formative ? ' · sin calificación' : ''}{sharedWith(a)}
+                          {instName(a.instrumentId)} · peso {a.weight}{a.from ? ` · ${a.from.slice(5).split('-').reverse().join('/')}–${(a.to ?? a.from).slice(5).split('-').reverse().join('/')}` : ''}{a.date ? ` · entrega ${a.date.slice(5).split('-').reverse().join('/')}` : ''}{a.unitId ? ` · ${units.find((u) => u.id === a.unitId)?.code ?? ''}` : ''}{a.classroomWorkId ? ' · Classroom' : group?.classroomCourseId ? ' · sin tarea en Classroom' : ''}{a.rubricId ? ` · rúbrica «${rubrics.find((r) => r.id === a.rubricId)?.name ?? 'borrada'}»` : ''}{a.fromObs ? ' · desde observaciones' : ''}{a.formative ? ' · sin calificación' : ''}{sharedWith(a)}
                         </div>
                         {noItems.has(a.id) && <div className="warn mute">⚠ Sin criterio</div>}
                         <div className="chips">

@@ -14,6 +14,8 @@ export function copyFor(a: Activity, groupId: string, id: string, shareId: strin
   const out: Activity = { id, subjectId: a.subjectId, groupId, termId: a.termId, instrumentId: a.instrumentId, title: a.title, weight: a.weight, nodeIds: [...a.nodeIds], shareId, updatedAt: now };
   for (const k of SHARED_FIELDS) if (a[k] !== undefined) (out as unknown as Record<string, unknown>)[k] = structuredClone(a[k]);
   if (a.date) out.date = a.date;
+  if (a.from) out.from = a.from;
+  if (a.to) out.to = a.to;
   return out;
 }
 

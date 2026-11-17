@@ -143,7 +143,6 @@ export function curriculumRecords(subject: Subject, p: ParsedCurriculum, existin
 // ---------- Objetivos de etapa ----------
 
 const OBJ_LEVEL: LevelDef = { key: 'obj', label: 'Objetivo de etapa', plural: 'Objetivos de etapa' };
-const OBJ_RELATION: RelationDef = { key: 'ce-obj', from: 'ce', to: 'obj' };
 
 export const objectivesPrompt = (stage: string) => `Dame los objetivos de la etapa de ${stage} tal como aparecen en el currículo vigente en Aragón (orden del Departamento de Educación publicada en el BOA, o el real decreto estatal si la orden no los recoge).
 Respóndeme SOLO con la lista, sin explicaciones: un objetivo por línea, empezando por su letra, por ejemplo:
@@ -164,17 +163,15 @@ export function parseObjectives(text: string): { code: string; text: string }[] 
   return out;
 }
 
-/** Nivel «Objetivo de etapa», relación competencia específica → objetivo y los objetivos que aún no estén. */
-export function objectivesRecords(subject: Subject, items: { code: string; text: string }[], existing: CNode[]) {
+/** Nivel «Objetivo de etapa» y los objetivos que aún no estén (con sus competencias clave, si vienen copiados). */
+export function objectivesRecords(subject: Subject, items: { code: string; text: string; keyComps?: string[] }[], existing: CNode[]) {
   const levels = subject.levels.some((l) => l.key === OBJ_LEVEL.key) ? subject.levels : [...subject.levels, OBJ_LEVEL];
-  const from = subject.levels.some((l) => l.key === 'ce') ? 'ce' : subject.levels[0]?.key ?? 'ce';
-  const relations = subject.relations.some((r) => r.to === OBJ_LEVEL.key) ? subject.relations : [...subject.relations, { ...OBJ_RELATION, key: `${from}-obj`, from }];
   const have = new Set(existing.filter((n) => !n.deleted).map((n) => n.id));
   let order = existing.reduce((m, n) => Math.max(m, n.order), 0) + 1;
   const now = Date.now();
   const nodes = items
-    .map((o) => ({ id: `${subject.id}/obj:${o.code}`, subjectId: subject.id, level: OBJ_LEVEL.key, code: o.code, title: o.text, order: 0, tags: [], updatedAt: now }))
+    .map((o) => ({ id: `${subject.id}/obj:${o.code}`, subjectId: subject.id, level: OBJ_LEVEL.key, code: o.code, title: o.text, order: 0, tags: [], ...(o.keyComps?.length ? { keyComps: o.keyComps } : {}), updatedAt: now }))
     .filter((n) => !have.has(n.id))
     .map((n) => ({ ...n, order: order++ }));
-  return { subject: { ...subject, levels, relations }, nodes };
+  return { subject: { ...subject, levels }, nodes };
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, uid } from '../data/db';
-import { addDays, parseHolidays, plannedSessions, schoolYearOf, subjectCalendar, ymd } from '../core/planning';
+import { addDays, parseHolidays, plannedSessions, schoolYearOf, sessionActivities, subjectCalendar, ymd } from '../core/planning';
 import { classesOfDay, pendingBefore, toGrade } from '../core/today';
 import type { DayClass } from '../core/today';
 import { absenceSummary } from '../core/rules';
@@ -221,7 +221,7 @@ export function Today({ nav }: { nav: TodayNav }) {
               </button>
             ))}
           </div>
-          {sel && <ClassCard c={sel} date={date} today={today} subject={subjectOf(sel.group.subjectId)!.name} sessions={sessions} attendance={attendance} units={units}
+          {sel && <ClassCard c={sel} date={date} today={today} subject={subjectOf(sel.group.subjectId)!.name} sessions={sessions} attendance={attendance} units={units} acts={data.activities}
             onList={() => nav.attendance(sel.group.subjectId, sel.group.id, date, sel.slot)} />}
         </>
       ) : (
@@ -289,11 +289,16 @@ export function Today({ nav }: { nav: TodayNav }) {
   );
 }
 
-function ClassCard(p: { c: DayClass; date: string; today: string; subject: string; sessions: import('../core/model').Session[]; attendance: import('../core/model').Attendance[]; units: import('../core/model').LearningUnit[]; onList: () => void }) {
+function ClassCard(p: { c: DayClass; date: string; today: string; subject: string; sessions: import('../core/model').Session[]; attendance: import('../core/model').Attendance[]; units: import('../core/model').LearningUnit[]; acts: import('../core/model').Activity[]; onList: () => void }) {
   const { c } = p;
   const [notes, setNotes] = useState(false);
   const s = c.session;
-  const u = s?.unitId ? p.units.find((x) => x.id === s.unitId) : undefined;
+  // Actividad de la clase: la elegida, la de la hora anterior seguida o la de su rango de fechas (aunque la sesión no exista aún).
+  const groupSes = p.sessions.filter((x) => x.groupId === c.group.id);
+  const here = s ?? { id: '__hoy', groupId: c.group.id, date: p.date, slot: c.slot, topic: '', updatedAt: 0 };
+  const act = sessionActivities(s ? groupSes : [...groupSes, here], p.acts.filter((a) => a.groupId === c.group.id)).get(here.id);
+  const unitId = act?.unitId ?? s?.unitId;
+  const u = unitId ? p.units.find((x) => x.id === unitId) : undefined;
   const prev = pendingBefore(p.sessions, c.group.id, p.date, c.slot);
   const rows = p.attendance.filter((r) => !r.deleted && r.groupId === c.group.id && r.date === p.date && r.slot === c.slot);
   const n = (k: string) => rows.filter((r) => r.status === k).length;
@@ -308,7 +313,7 @@ function ClassCard(p: { c: DayClass; date: string; today: string; subject: strin
       <div className="sp"><span className={'badge ' + (main ? 'next' : c.state)}>{badge} · {c.slot}.ª hora</span>{c.time && <span className="mute">{c.time.start} – {c.time.end}</span>}</div>
       <div>
         <div className="big">{c.group.name} · {p.subject}</div>
-        <div className="ink2">{[u && `${u.code} ${u.title}`, s?.topic].filter(Boolean).join(' · ') || 'Sin unidad ni tema'}</div>
+        <div className="ink2">{[act && `Actividad: ${act.title}`, u && `${u.code} ${u.title}`, s?.topic].filter(Boolean).join(' · ') || 'Sin actividad ni tema'}</div>
       </div>
       {prev && <div className="pend"><Icon name="back" size={16} /> <span><b>Pendiente de la sesión anterior:</b> {prev}</span></div>}
       {rows.length > 0 && <div className="ink2">Asistencia: {n('P') + n('R')} presentes{n('A') ? ` · ${n('A')} ausentes` : ''}{n('R') ? ` · ${n('R')} retrasos` : ''}{n('J') ? ` · ${n('J')} justificadas` : ''}</div>}

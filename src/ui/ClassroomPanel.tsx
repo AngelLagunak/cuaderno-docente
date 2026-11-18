@@ -13,7 +13,7 @@ import type { Activity, CLink, CNode, Group, Student, Subject } from '../core/mo
  * Classroom no permite indicarlas, así que se enlazan aquí. Una fila puede medir varias concreciones. Al guardar, los
  * puntos de cada alumno en la fila pasan a ser su nota en esas concreciones (sin pisar las que cambiaste en la app).
  */
-export function RubricMap(p: { subject: Subject; act: Activity; nodes: CNode[]; links: CLink[]; onResult: (r: PullResult) => void; open?: boolean }) {
+export function RubricMap(p: { subject: Subject; act: Activity; nodes: CNode[]; links: CLink[]; onResult: (r: PullResult) => void; open?: boolean; onSaved?: (a: Activity) => void }) {
   const { act } = p;
   const init = () => Object.fromEntries(Object.keys(act.classroomRubricMap ?? {}).map((k) => [k, rowNodes(act.classroomRubricMap, k)]));
   const [map, setMap] = useState<Record<string, string[]>>(init);
@@ -29,6 +29,7 @@ export function RubricMap(p: { subject: Subject; act: Activity; nodes: CNode[]; 
     const clean = Object.fromEntries(Object.entries(map).filter(([, v]) => v.length));
     const a = { ...act, classroomRubricMap: clean, nodeIds: [...new Set([...act.nodeIds, ...mappedNodes(clean)])] };
     await saveActivity(a);
+    p.onSaved?.(a);
     p.onResult(await undoable('emparejamiento de rúbrica', () => remapRubric(a)));
   }
 

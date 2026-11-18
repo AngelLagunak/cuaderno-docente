@@ -130,6 +130,10 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
   const [week, setWeek] = useState(monday(ymd(new Date())));
   const [gen, setGen] = useState(false);
   const [msg, setMsg] = useState('');
+  const [mode, setModeState] = useState<'week' | 'month' | 'seq'>(() => { try { return (localStorage.getItem('calView') as 'week' | 'month' | 'seq') || 'week'; } catch { return 'week'; } });
+  const setMode = (m: 'week' | 'month' | 'seq') => { setModeState(m); try { localStorage.setItem('calView', m); } catch { /* sin almacenamiento */ } };
+  const scal = useSubjectCalendar(subject, group?.schoolYear);
+  const off = parseHolidays((scal?.holidays ?? '') + '\n' + (group?.holidays ?? ''));
   const raw = useLiveQuery(() => (group ? db.sessions.where('groupId').equals(group.id).toArray() : []), [group?.id]);
   const sessions = (raw ?? []).filter((s) => !s.deleted).sort(bySessionOrder);
   // Actividad y unidad efectivas de cada sesión (elegida, continuación de la hora anterior o por fechas).
@@ -163,6 +167,12 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
       </div>
       {gen && <Generate group={group} subject={subject} existing={sessions} onDone={(m) => { setGen(false); if (m) setMsg(m); }} />}
       {msg && <p className="mute">{msg}</p>}
+      <div className="seg" role="group" aria-label="Vista del calendario">
+        {([['week', 'Semana'], ['month', 'Mes'], ['seq', 'Secuencia']] as const).map(([k, l]) => <button key={k} aria-pressed={mode === k} className={mode === k ? 'on' : ''} onClick={() => setMode(k)}>{l}</button>)}
+      </div>
+      {mode === 'month' && <MonthView sessions={effSessions} acts={gActs} units={units} holidays={off} onDay={(d) => { setWeek(monday(d)); setMode('week'); }} />}
+      {mode === 'seq' && <SequenceView sessions={effSessions} acts={gActs} units={units} />}
+      {mode === 'week' && (<>
       <div className="row">
         <button className="small" onClick={() => setWeek(addDays(week, -7))}>‹</button>
         <b>Semana del {dm(week)}</b>
@@ -183,6 +193,7 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
           );
         })}
       </div>
+      </>)}
       {units.length > 0 && (
         <details className="card">
           <summary>Sesiones por unidad ({sessions.length} sesiones · {effSessions.filter((s) => !s.unitId).length} sin unidad)</summary>
@@ -198,6 +209,97 @@ export function Calendar({ subject, groups, units, acts }: { subject: Subject; g
           })}
         </details>
       )}
+    </div>
+  );
+}
+
+/** Color de cada actividad, por su orden en el curso (actividades seguidas tienen colores bien distintos). */
+const PALETTE = ['#2d6cdf', '#e08a1e', '#2e9d5b', '#b23a8a', '#c0392b', '#1f9aa8', '#8a6d1f', '#6b4fd0'];
+const colorsOf = (acts: Activity[]) => {
+  const order = [...acts].sort((a, b) => (a.from ?? a.date ?? '9').localeCompare(b.from ?? b.date ?? '9') || a.title.localeCompare(b.title));
+  const m = new Map(order.map((a, i) => [a.id, PALETTE[i % PALETTE.length]]));
+  return (id?: string) => (id && m.get(id)) || 'var(--line)';
+};
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/** Mes de lunes a viernes: las sesiones de cada día con su actividad; los días no lectivos, marcados. */
+function MonthView(p: { sessions: Session[]; acts: Activity[]; units: LearningUnit[]; holidays: Set<string>; onDay: (date: string) => void }) {
+  const [month, setMonth] = useState(() => ymd(new Date()).slice(0, 7));
+  const [y, m] = month.split('-').map(Number);
+  const first = `${month}-01`;
+  const last = ymd(new Date(y, m, 0));
+  const shift = (n: number) => { const d = new Date(y, m - 1 + n, 1); setMonth(ymd(d).slice(0, 7)); };
+  const weeks: string[][] = [];
+  for (let w = monday(first); w <= last; w = addDays(w, 7)) weeks.push([0, 1, 2, 3, 4].map((i) => addDays(w, i)));
+  const byId = new Map(p.acts.map((a) => [a.id, a]));
+  const actColor = colorsOf(p.acts);
+  const today = ymd(new Date());
+  return (
+    <div>
+      <div className="row">
+        <button className="small" aria-label="Mes anterior" onClick={() => shift(-1)}>‹</button>
+        <b>{MONTHS[m - 1]} de {y}</b>
+        <button className="small" aria-label="Mes siguiente" onClick={() => shift(1)}>›</button>
+        <button className="small" onClick={() => setMonth(today.slice(0, 7))}>Hoy</button>
+      </div>
+      <div className="month">
+        {DAYS.map((d) => <div className="mhead" key={d}>{d.slice(0, 3)}</div>)}
+        {weeks.flat().map((d) => {
+          const list = p.sessions.filter((s) => s.date === d);
+          const out = d.slice(0, 7) !== month;
+          return (
+            <button key={d} className={'mday' + (out ? ' out' : '') + (d === today ? ' today' : '') + (p.holidays.has(d) ? ' off' : '')} onClick={() => p.onDay(d)} title="Ver la semana">
+              <span className="mnum">{Number(d.slice(8))}</span>
+              {p.holidays.has(d) && !list.length && <span className="mute">No lectivo</span>}
+              {list.map((s) => {
+                const a = s.activityId ? byId.get(s.activityId) : undefined;
+                const u = p.units.find((x) => x.id === s.unitId);
+                return <span key={s.id} className="mses" style={{ borderLeftColor: actColor(a?.id) }}>{s.slot}.ª {a?.title ?? u?.code ?? 'sin actividad'}{s.done ? ' ✓' : ''}</span>;
+              })}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Secuencia de actividades: solo las sesiones de clase, en orden, agrupadas en tramos seguidos de la misma
+ * actividad (los días sin clase no aparecen). Sirve para ver cómo se van encadenando las actividades.
+ */
+function SequenceView(p: { sessions: Session[]; acts: Activity[]; units: LearningUnit[] }) {
+  const byId = new Map(p.acts.map((a) => [a.id, a]));
+  const actColor = colorsOf(p.acts);
+  const today = ymd(new Date());
+  const blocks: { key: string; act?: Activity; unitId?: string; list: Session[] }[] = [];
+  for (const s of [...p.sessions].sort(bySessionOrder)) {
+    const k = s.activityId ?? (s.unitId ? 'u:' + s.unitId : '-');
+    const b = blocks[blocks.length - 1];
+    if (b && b.key === k) b.list.push(s);
+    else blocks.push({ key: k, act: s.activityId ? byId.get(s.activityId) : undefined, unitId: s.unitId, list: [s] });
+  }
+  if (!blocks.length) return <p className="mute">Aún no hay sesiones: genéralas desde el horario.</p>;
+  const nowIdx = blocks.findIndex((b) => b.list.some((s) => s.date >= today));
+  return (
+    <div className="seq">
+      {blocks.map((b, i) => {
+        const u = p.units.find((x) => x.id === b.unitId);
+        const from = b.list[0].date, to = b.list[b.list.length - 1].date;
+        const done = b.list.filter((s) => s.date < today).length;
+        return (
+          <section key={i} className={'seqb' + (i === nowIdx ? ' now' : '') + (to < today ? ' past' : '')} style={{ borderLeftColor: actColor(b.act?.id) }}>
+            <div className="sp">
+              <b>{b.act?.title ?? (u ? `${u.code} (sin actividad)` : 'Sin actividad')}</b>
+              <span className="mute">{b.list.length} {b.list.length === 1 ? 'sesión' : 'sesiones'}{done && done < b.list.length ? ` · ${done} hechas` : ''}</span>
+            </div>
+            <div className="mute">{u ? `${u.code} ${u.title} · ` : ''}{dm(from)}{from !== to ? `–${dm(to)}` : ''}</div>
+            <div className="chips">
+              {b.list.map((s) => <span key={s.id} className={'chip' + (s.date === today ? ' on' : '')} title={[s.topic, s.done && `Realizado: ${s.done}`, s.pending && `Pendiente: ${s.pending}`].filter(Boolean).join('\n')}>{dm(s.date)} {s.slot}.ª{s.done ? ' ✓' : ''}</span>)}
+            </div>
+          </section>
+        );
+      })}
     </div>
   );
 }

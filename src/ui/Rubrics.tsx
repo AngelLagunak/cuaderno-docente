@@ -3,7 +3,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, saveRubric, softDelete, uid } from '../data/db';
 import { NodePicker } from './NodePicker';
 import { defaultLevels } from '../core/model';
-import type { CNode, Rubric, Subject } from '../core/model';
+import type { Activity, CNode, Rubric, Subject } from '../core/model';
+import { rowNodes } from '../core/classroom';
 
 function RubricForm(p: { subject: Subject; nodes: CNode[]; init: Rubric; onDone: () => void }) {
   const [r, setR] = useState(p.init);
@@ -54,7 +55,8 @@ function RubricForm(p: { subject: Subject; nodes: CNode[]; init: Rubric; onDone:
 }
 
 /** Rúbricas propias de la materia: niveles 1–4 con su nota y una fila por criterio. */
-export function Rubrics({ subject, nodes }: { subject: Subject; nodes: CNode[] }) {
+/** Rúbricas propias (editables) y, aparte, las traídas de Classroom con las concreciones enlazadas a cada fila. */
+export function Rubrics({ subject, nodes, classroom = [], onEdit }: { subject: Subject; nodes: CNode[]; classroom?: Activity[]; onEdit?: (a: Activity) => void }) {
   const raw = useLiveQuery(() => db.rubrics.where('subjectId').equals(subject.id).toArray(), [subject.id]);
   const list = (raw ?? []).filter((r) => !r.deleted).sort((a, b) => a.name.localeCompare(b.name, 'es'));
   const used = useLiveQuery(() => db.activities.where('subjectId').equals(subject.id).filter((a) => !a.deleted && !!a.rubricId).toArray(), [subject.id]);
@@ -63,8 +65,31 @@ export function Rubrics({ subject, nodes }: { subject: Subject; nodes: CNode[] }
   const uses = (id: string) => (used ?? []).filter((a) => a.rubricId === id).length;
   const fresh = (): Rubric => ({ id: uid(), subjectId: subject.id, name: '', levels: defaultLevels(), rows: [], updatedAt: Date.now() });
 
+  const clsBlock = classroom.length > 0 && (
+    <>
+      <b className="mute">Rúbricas de Classroom</b>
+      {classroom.map((a) => {
+        const rows = a.rubric!.criteria;
+        const done = rows.filter((c) => rowNodes(a.classroomRubricMap, c.id).length).length;
+        return (
+          <div className="card" key={a.id}>
+            <div className="sp"><b>{a.title}</b>{onEdit && <button className="small" onClick={() => onEdit(a)}>Enlazar concreciones</button>}</div>
+            <div className={done < rows.length ? 'warn' : 'mute'}>{done} de {rows.length} filas enlazadas con concreciones</div>
+            {rows.map((c) => (
+              <div className="issue" key={c.id}>
+                <span style={{ flex: 1 }}>{c.title || 'Fila'} <span className="mute">· {c.levels.map((l) => `${l.title || 'nivel'} ${l.points}`).join(' / ')}</span></span>
+                <span className="chips">{rowNodes(a.classroomRubricMap, c.id).map((id) => byId.get(id)).filter((x): x is CNode => !!x).map((x) => <span className="chip" key={x.id} title={x.title}>{x.code}</span>)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </>
+  );
+
   return (
     <div>
+      {clsBlock}
       {list.length === 0 && !edit && <p className="mute">Sin rúbricas. Una rúbrica traduce niveles (1–4) a nota y se califica con un toque por criterio.</p>}
       {list.map((r) => (
         edit?.id === r.id ? null : (

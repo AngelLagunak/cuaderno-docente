@@ -7,11 +7,13 @@ import { NodePicker } from './NodePicker';
 import { Rubrics } from './Rubrics';
 import { Calendar } from './Calendar';
 import { Overview } from './Overview';
+import { RubricMap } from './ClassroomPanel';
+import { describe } from '../data/classroomSync';
 import { AdaptBadge } from './Groups';
 import { callScript } from '../data/api';
 import type { CWork } from '../data/api';
 import { activitiesWithoutItems, assessableNodes, coverage, gradedLevels, unitNodeIds } from '../core/curriculum';
-import type { Activity, CNode, Group, LearningUnit, Rubric, Subject } from '../core/model';
+import type { Activity, CLink, CNode, Group, LearningUnit, Rubric, Subject } from '../core/model';
 
 /** Niveles de contenidos (saberes básicos): no se evalúan ni tienen relaciones; se eligen en cada unidad. */
 const contentLevelsOf = (s: Subject) => s.levels.filter((l) => !l.graded && !s.relations.some((r) => r.from === l.key || r.to === l.key));
@@ -104,10 +106,11 @@ function ClassroomLink(p: { a: Activity; group?: Group; others: Activity[]; node
   );
 }
 
-function ActForm(p: { subject: Subject; nodes: CNode[]; assessable: Set<string>; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; groups: Group[]; all: Activity[]; others: Activity[]; init: Activity; onDone: () => void }) {
+function ActForm(p: { subject: Subject; nodes: CNode[]; links: CLink[]; assessable: Set<string>; units: LearningUnit[]; rubrics: Rubric[]; group?: Group; groups: Group[]; all: Activity[]; others: Activity[]; init: Activity; onDone: () => void }) {
   const [a, setA] = useState(p.init);
   const [w, setW] = useState(String(p.init.weight));
   const [pick, setPick] = useState(false);
+  const [rmsg, setRmsg] = useState('');
   // Grupos: una actividad nueva se crea por defecto en todos los grupos de la asignatura (mismos criterios).
   const isNew = !p.all.some((x) => x.id === a.id);
   const copies = a.shareId ? p.all.filter((x) => x.shareId === a.shareId && x.id !== a.id && !x.deleted) : [];
@@ -150,8 +153,14 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; assessable: Set<string>;
         <label>al <input type="date" value={a.to ?? ''} min={a.from} onChange={(e) => setA({ ...a, to: e.target.value || undefined })} /></label>
       </div>
       {a.from && <p className="mute">Las sesiones de esos días quedan asignadas a esta actividad (y a su unidad) sin marcarlas una a una.</p>}
+      {a.rubric && (
+        <RubricMap key={'rm' + a.id} subject={p.subject} act={a} nodes={p.nodes} links={p.links} open
+          onSaved={(x) => setA((cur) => ({ ...cur, classroomRubricMap: x.classroomRubricMap, nodeIds: x.nodeIds }))}
+          onResult={(r) => setRmsg(describe(r, ' con el nuevo emparejamiento'))} />
+      )}
+      {rmsg && <p className="mute">{rmsg}</p>}
       <select value={a.rubricId ?? ''} onChange={(e) => setA({ ...a, rubricId: e.target.value || undefined })}>
-        <option value="">Sin rúbrica (nota numérica)</option>
+        <option value="">{a.rubric ? 'Sin rúbrica propia (usa la de Classroom)' : 'Sin rúbrica (nota numérica)'}</option>
         {p.rubrics.map((r) => <option key={r.id} value={r.id}>Rúbrica: {r.name}</option>)}
       </select>
       <label><input type="checkbox" checked={!!a.formative} onChange={(e) => setA({ ...a, formative: e.target.checked || undefined, fromObs: e.target.checked ? undefined : a.fromObs })} /> Sin calificación (evaluación formativa: solo comentario al alumno; no cuenta en la nota ni avisa de notas pendientes)</label>
@@ -392,7 +401,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
           </div>
           {imp && group && <WorkImport subject={subject} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} existing={acts} onDone={() => setImp(false)} />}
           {noItems.size > 0 && <p className="warn">⚠ {noItems.size === 1 ? '1 actividad' : `${noItems.size} actividades`} sin criterio: solo admiten nota global y no aportan al perfil competencial.</p>}
-          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} assessable={assessable} units={units} rubrics={rubrics} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} others={acts} init={ea} onDone={() => setEa(null)} />}
+          {ea && <ActForm key={ea.id} subject={subject} nodes={nodes} links={(lkRaw ?? []).filter((l) => !l.deleted)} assessable={assessable} units={units} rubrics={rubrics} group={group} groups={groups} all={(actsRaw ?? []).filter((x) => !x.deleted)} others={acts} init={ea} onDone={() => setEa(null)} />}
           {subject.terms.map((t) => {
             const list = acts.filter((a) => a.termId === t.id);
             return (
@@ -442,7 +451,7 @@ export function Planner({ subject, onProgress }: { subject: Subject; onProgress?
       )}
 
       <h3>Rúbricas</h3>
-      <Rubrics subject={subject} nodes={nodes} />
+      <Rubrics subject={subject} nodes={nodes} classroom={acts.filter((a) => a.rubric)} onEdit={(a) => { setEa(a); window.scrollTo(0, 0); }} />
 
       {cov.length > 0 && (
         <details className="card">

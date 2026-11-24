@@ -1,0 +1,6 @@
+#!/bin/sh
+# Rechaza mensajes de commit con enlaces a sesiones privadas de Claude (el repositorio es público).
+if grep -qiE 'claude\.ai/code/|^Claude-Session:' "$1"; then
+  echo "Commit rechazado: el mensaje lleva un enlace a una sesión de Claude (claude.ai/code/… o Claude-Session:). Quítalo." >&2
+  exit 1
+fi

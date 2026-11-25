@@ -185,6 +185,25 @@ export interface Activity extends Stamp {
   to?: string;
   /** Nota de la actividad para alumnado con adaptación (por alumno). Es de cada grupo, no se comparte. */
   adaptations?: Record<ID, string>;
+  /**
+   * Equipos de trabajo de esta actividad (de cada grupo, no se comparten). La nota que se pone al equipo se copia a sus
+   * integrantes; quien tenga una nota ajustada a mano la conserva.
+   */
+  teams?: Team[];
+}
+
+/** Nota de un equipo: la global (`value`) o la de una concreción, con su nivel de rúbrica. */
+export interface TeamMark { value: number | null; level?: number }
+
+export interface Team {
+  id: ID;
+  name: string;
+  studentIds: ID[];
+  /** Nota global del equipo (actividad sin criterios). */
+  mark?: TeamMark;
+  /** Nota del equipo por concreción o criterio. */
+  items?: Record<ID, TeamMark>;
+  comment?: string;
 }
 
 /**

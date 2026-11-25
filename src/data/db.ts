@@ -1,10 +1,11 @@
 import Dexie, { type Table } from 'dexie';
 import { linkId } from '../core/model';
-import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, SchoolCalendar, Session, Snapshot, Stamp, Student, Subject } from '../core/model';
+import type { Activity, Attendance, Message, Template, CLink, CNode, Grade, Group, LearningUnit, Rubric, SchoolCalendar, Session, Snapshot, Stamp, Student, Subject, Team, TeamMark } from '../core/model';
 import { catalogs } from '../catalogs';
 import { migrateSubject, refreshedCatalogNodes } from '../core/curriculum';
 import { restoreChanges, takeSnapshot } from '../core/versions';
 import { propagate } from '../core/shared';
+import { followers } from '../core/teams';
 
 class DB extends Dexie {
   subjects!: Table<Subject, string>;
@@ -126,7 +127,7 @@ export async function deleteNode(n: CNode) {
 
 // ---------- Deshacer (cambios de notas y alumnos de esta sesión) ----------
 
-type UndoEntry = { table: 'grades' | 'students'; id: string; before: Grade | Student | undefined };
+type UndoEntry = { table: 'grades' | 'students' | 'activities'; id: string; before: Grade | Student | Activity | undefined };
 const undoStack: { label: string; entries: UndoEntry[] }[] = [];
 let batch: { label: string; entries: UndoEntry[] } | null = null;
 const undoSubs = new Set<() => void>();
@@ -162,11 +163,11 @@ export async function undo() {
   if (!g) return '';
   const now = Date.now();
   for (const e of [...g.entries].reverse()) {
-    const t = e.table === 'grades' ? db.grades : db.students;
-    if (e.before) await (t as Table<Grade | Student, string>).put({ ...e.before, updatedAt: now });
+    const t = (e.table === 'grades' ? db.grades : e.table === 'students' ? db.students : db.activities) as Table<Grade | Student | Activity, string>;
+    if (e.before) await t.put({ ...e.before, updatedAt: now });
     else {
       const cur = await t.get(e.id);
-      if (cur) await (t as Table<Grade | Student, string>).put({ ...cur, deleted: true, updatedAt: now });
+      if (cur) await t.put({ ...cur, deleted: true, updatedAt: now });
     }
   }
   return g.label;
@@ -186,6 +187,47 @@ export async function saveItemGrade(studentId: string, activityId: string, nodeI
   const cur = await db.grades.get(id);
   remember('grades', id, cur, 'nota de criterio');
   await db.grades.put({ id, studentId, activityId, nodeId, value: null, ...cur, ...patch, deleted: false, updatedAt: Date.now() });
+}
+
+/** Cambia los equipos de una actividad (se puede deshacer). */
+export async function saveTeams(a: Activity, teams: Team[], label = 'equipos') {
+  const cur = await db.activities.get(a.id);
+  if (!cur) return;
+  remember('activities', a.id, cur, label);
+  await db.activities.put({ ...cur, teams: teams.length ? teams : undefined, updatedAt: Date.now() });
+}
+
+/**
+ * Pone la nota a un equipo (global si `nodeId` falta, o de una concreción) y la copia a sus integrantes, salvo a quien
+ * tenga una nota ajustada a mano. Con `force`, la copia a todos.
+ */
+export async function gradeTeam(actId: string, teamId: string, nodeId: string | undefined, mark: TeamMark, force = false) {
+  await undoable('nota del equipo', async () => {
+    const a = await db.activities.get(actId);
+    const team = a?.teams?.find((t) => t.id === teamId);
+    if (!a || !team) return;
+    const old = nodeId ? team.items?.[nodeId] : team.mark;
+    const cur = new Map((await db.grades.bulkGet(team.studentIds.map((s) => [s, actId, nodeId].filter(Boolean).join('|')))).map((g, i) => [team.studentIds[i], g && !g.deleted ? g : undefined]));
+    const to = force ? team.studentIds : followers(team, old, (s) => cur.get(s));
+    const patch = { value: mark.value, level: mark.value == null ? undefined : mark.level };
+    for (const s of to) await (nodeId ? saveItemGrade(s, actId, nodeId, patch) : saveGrade(s, actId, patch));
+    const next = { ...team, ...(nodeId ? { items: { ...team.items, [nodeId]: patch } } : { mark: patch }) };
+    await saveTeams(a, a.teams!.map((t) => (t.id === teamId ? next : t)));
+  });
+}
+
+/** Comentario del equipo: llega a quien no tenga comentario o tuviera el anterior del equipo. */
+export async function commentTeam(actId: string, teamId: string, comment: string) {
+  await undoable('comentario del equipo', async () => {
+    const a = await db.activities.get(actId);
+    const team = a?.teams?.find((t) => t.id === teamId);
+    if (!a || !team) return;
+    for (const s of team.studentIds) {
+      const g = await db.grades.get(`${s}|${actId}`);
+      if (!g?.comment || g.deleted || g.comment === team.comment) await saveGrade(s, actId, { comment: comment || undefined });
+    }
+    await saveTeams(a, a.teams!.map((t) => (t.id === teamId ? { ...t, comment: comment || undefined } : t)));
+  });
 }
 
 /** Cambia datos de un alumno (pérdida de evaluación continua, extraordinaria…). */

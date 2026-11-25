@@ -6,6 +6,8 @@ import { ObsPanel } from './ObsPanel';
 import { Cell, RecMark, fmt, parse, raw } from './cells';
 import { FinalView } from './FinalView';
 import { StudentGrader } from './StudentGrader';
+import { Teams } from './Teams';
+import { teamOf } from '../core/teams';
 import { Menu } from './Menu';
 import { Icon } from './icons';
 import { canImprove, outcome, scaleLabel } from '../core/rules';
@@ -89,7 +91,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
   const [busy, setBusy] = useState(false);
   const [imp, setImp] = useState(false);
   const [sigad, setSigad] = useState(false);
-  const [mode, setMode] = useState<'one' | 'list'>('one');
+  const [mode, setMode] = useState<'one' | 'list' | 'teams'>('one');
   const [stuIdx, setStuIdx] = useState(0);
   const undoLabel = useSyncExternalStore(subscribeUndo, lastUndo);
 
@@ -293,6 +295,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
           <div className="seg" role="group" aria-label="Modo">
             <button aria-pressed={mode === 'one'} className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>Un alumno</button>
             <button aria-pressed={mode === 'list'} className={mode === 'list' ? 'on' : ''} onClick={() => setMode('list')}>Lista</button>
+            <button aria-pressed={mode === 'teams'} className={mode === 'teams' ? 'on' : ''} onClick={() => setMode('teams')}>Equipos{act.teams?.length ? ` (${act.teams.length})` : ''}</button>
           </div>
         </div>
       )}
@@ -317,6 +320,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
             </table>
           </div>
           <StudentGrader subject={subject} act={act} acts={acts} student={stu} sg={sgOf(stu)} items={actItems(act)} rubric={rubricOf(act)} curr={curr}
+            team={teamOf(act, stu.id)?.name}
             pos={act.formative ? `${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · sin calificación` : `${Math.min(stuIdx, students.length - 1) + 1} de ${students.length} · ${actItems(act).filter((n) => sgOf(stu).byItem.get(act.id)?.get(n.id)?.value != null).length} de ${actItems(act).length} criterios`}
             onStudent={onStudent && (() => onStudent(stu.id))} onPrev={() => setStuIdx((stuIdx - 1 + students.length) % students.length)} onNext={() => setStuIdx((stuIdx + 1) % students.length)} />
         </div>
@@ -411,6 +415,11 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
             );
           })}
         </div>
+      )}
+
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'teams' && (
+        <Teams key={act.id} act={act} acts={acts} students={students} items={actItems(act)} rubric={rubricOf(act)} sgOf={sgOf} onMsg={setMsg}
+          onStudent={(s) => { setStuIdx(students.findIndex((x) => x.id === s.id)); setMode('one'); window.scrollTo(0, 0); }} />
       )}
 
       {students.length > 0 && acts.length > 0 && view === 'final' && (

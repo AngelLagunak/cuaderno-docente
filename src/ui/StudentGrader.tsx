@@ -12,7 +12,7 @@ import { AdaptBadge } from './Groups';
  */
 export function StudentGrader(p: {
   subject: Subject; act: Activity; acts: Activity[]; student: Student; pos: string; sg: StudentGrades; items: CNode[]; rubric?: Rubric; curr: Curr;
-  onPrev: () => void; onNext: () => void; onStudent?: () => void;
+  onPrev: () => void; onNext: () => void; onStudent?: () => void; team?: string;
 }) {
   const { subject, act, student: s, sg, rubric } = p;
   const overall = sg.byActivity.get(act.id);
@@ -29,7 +29,7 @@ export function StudentGrader(p: {
     <section className="card grader" aria-label={`Calificar a ${s.firstName} ${s.lastName}`}>
       <div className="stunav">
         <button aria-label="Alumno anterior" onClick={p.onPrev}><Icon name="left" /></button>
-        <div><b>{p.onStudent ? <button className="linkish" title="Ver su ficha" onClick={p.onStudent}>{s.firstName} {s.lastName}</button> : `${s.firstName} ${s.lastName}`}</b><AdaptBadge s={s} /><span className="mute">{p.pos}</span></div>
+        <div><b>{p.onStudent ? <button className="linkish" title="Ver su ficha" onClick={p.onStudent}>{s.firstName} {s.lastName}</button> : `${s.firstName} ${s.lastName}`}</b><AdaptBadge s={s} /><span className="mute">{p.team ? `${p.team} · ` : ''}{p.pos}</span></div>
         <button aria-label="Alumno siguiente" onClick={p.onNext}><Icon name="right" /></button>
       </div>
 

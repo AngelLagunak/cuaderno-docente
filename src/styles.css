@@ -353,3 +353,14 @@ button.stuname:hover { color:var(--brand); text-decoration:underline; }
 .seqb.past { opacity:.7; }
 .seqb.now { box-shadow:0 0 0 2px var(--brand); }
 .seqb .chip.on { background:var(--brand); color:#fff; }
+
+/* Equipos */
+.teams { display:flex; flex-direction:column; gap:12px; }
+.teamgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:10px; margin:8px 0; }
+.teamedit { border:1px solid var(--line); border-radius:10px; padding:8px; display:flex; flex-direction:column; gap:4px; }
+.teamedit input { min-width:0; flex:1; }
+.member { align-items:center; gap:8px; font-size:.9rem; padding:3px 0; }
+.member select { max-width:9.5rem; }
+.teamcard { display:flex; flex-direction:column; gap:10px; }
+.teamcard .members { border-top:1px solid var(--line2); padding-top:6px; }
+.cell.wide { width:100%; text-align:left; }

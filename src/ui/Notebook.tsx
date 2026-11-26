@@ -245,7 +245,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
   const termVals = students.map((s) => termResult(subject, acts, sgOf(s), term.id, curr).value);
   const withVal = termVals.filter((v): v is number => v != null);
   const missing = students.reduce((n, s) => n + termActs.filter((a) => !a.formative && activityBase(a, sgOf(s)) == null).length, 0);
-  const openAct = (a: Activity, s?: Student) => { setActId(a.id); setView('act'); setMode('one'); if (s) setStuIdx(students.findIndex((x) => x.id === s.id)); window.scrollTo(0, 0); };
+  const openAct = (a: Activity, s?: Student) => { setActId(a.id); setView('act'); setMode(a.teams?.length && !s ? 'teams' : 'one'); if (s) setStuIdx(students.findIndex((x) => x.id === s.id)); window.scrollTo(0, 0); };
   const menu: [string, () => void, boolean?][] = [
     ...(group.classroomCourseId && linked > 0 ? [['Traer notas de Classroom', () => pullAll(), busy] as [string, () => void, boolean]] : []),
     ['Importar notas (CSV o Excel)', () => setImp(!imp)],
@@ -254,6 +254,8 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
     ['Notas para SIGAD', () => setSigad(!sigad)],
   ];
   const stu = students[Math.min(stuIdx, students.length - 1)];
+  // Si la actividad deja de ser en equipos, se califica alumno a alumno.
+  const curMode = mode === 'teams' && !act?.teams?.length ? 'one' : mode;
 
   return (
     <div>
@@ -289,21 +291,21 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
 
       {students.length > 0 && acts.length > 0 && view === 'act' && act && (
         <div className="row">
-          <select aria-label="Actividad" value={act.id} onChange={(e) => setActId(e.target.value)}>
+          <select aria-label="Actividad" value={act.id} onChange={(e) => { setActId(e.target.value); const n = acts.find((a) => a.id === e.target.value); if (mode === 'teams' || n?.teams?.length) setMode(n?.teams?.length ? 'teams' : 'one'); }}>
             {acts.map((a) => <option key={a.id} value={a.id}>{a.title} · {subject.terms.find((t) => t.id === a.termId)?.name}</option>)}
           </select>
           <div className="seg" role="group" aria-label="Modo">
-            <button aria-pressed={mode === 'one'} className={mode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>Un alumno</button>
+            <button aria-pressed={curMode === 'one'} className={curMode === 'one' ? 'on' : ''} onClick={() => setMode('one')}>Un alumno</button>
             <button aria-pressed={mode === 'list'} className={mode === 'list' ? 'on' : ''} onClick={() => setMode('list')}>Lista</button>
-            <button aria-pressed={mode === 'teams'} className={mode === 'teams' ? 'on' : ''} onClick={() => setMode('teams')}>Equipos{act.teams?.length ? ` (${act.teams.length})` : ''}</button>
+            {act.teams?.length ? <button aria-pressed={mode === 'teams'} className={mode === 'teams' ? 'on' : ''} onClick={() => setMode('teams')}>Equipos ({act.teams.length})</button> : null}
           </div>
         </div>
       )}
 
-      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'one' && stu && act.rubric && (
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && curMode === 'one' && stu && act.rubric && (
         <RubricMap key={'r' + act.id + (act.updatedAt ?? 0)} subject={subject} act={act} nodes={nodes} links={curr.links} onResult={(r) => finish(r, ' con el nuevo emparejamiento')} />
       )}
-      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'one' && stu && (
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && curMode === 'one' && stu && (
         <div className="gradeLayout">
           <div className="tw sideTable">
             <table className="t">
@@ -332,7 +334,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
             <thead>
               <tr>
                 <th>Alumno</th>
-                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}><button className="linkish" title="Calificar esta actividad" onClick={() => openAct(a)}>{a.title}</button><div className="mute">{a.formative ? 'sin nota' : instName(a.instrumentId).slice(0, 10)}</div>{gl && !a.formative && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
+                {termActs.map((a) => <th key={a.id} title={`${a.title} · ${instName(a.instrumentId)}`}><button className="linkish" title="Calificar esta actividad" onClick={() => openAct(a)}>{a.title}</button><div className="mute">{a.formative ? 'sin nota' : instName(a.instrumentId).slice(0, 10)}</div>{a.teams?.length ? <div className="mute" title={`${a.teams.length} equipos: se califica por equipos`}>👥 equipos</div> : null}{gl && !a.formative && actItems(a).length === 0 && <div className="warn" title="Sin criterios: no cuenta para la nota">⚠ no cuenta</div>}</th>)}
                 {partsHead.map((p) => <th key={p.id} className="sum" title={p.title}>{p.name}</th>)}
                 <th className="sum">{term.name}</th>
               </tr>
@@ -362,7 +364,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
       )}
       {view === 'table' && students.length > 0 && <p className="mute">* Provisional: faltan {partLabel} por evaluar.{gl ? ` La nota de la evaluación es la media de las ${partLabel} evaluadas.` : ''} Lo no evaluado no cuenta como 0. Se guarda al salir de la casilla o con Intro. Las notas sombreadas son la media de los criterios (se editan en «Por actividad»).</p>}
 
-      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'list' && (
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && curMode === 'list' && (
         <div className="card">
           <b>{act.title}</b>
           <div className="mute">{instName(act.instrumentId)} · peso {act.weight}{act.maxPoints ? ` · ${act.maxPoints} pts en Classroom` : ''}{rubricOf(act) ? ` · rúbrica «${rubricOf(act)!.name}»` : ''}</div>
@@ -417,7 +419,7 @@ export function Notebook({ subject, focusAct, onProgress, onStudent }: { subject
         </div>
       )}
 
-      {students.length > 0 && acts.length > 0 && view === 'act' && act && mode === 'teams' && (
+      {students.length > 0 && acts.length > 0 && view === 'act' && act && curMode === 'teams' && (
         <Teams key={act.id} act={act} acts={acts} students={students} items={actItems(act)} rubric={rubricOf(act)} sgOf={sgOf} onMsg={setMsg}
           onStudent={(s) => { setStuIdx(students.findIndex((x) => x.id === s.id)); setMode('one'); window.scrollTo(0, 0); }} />
       )}

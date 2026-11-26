@@ -24,8 +24,91 @@ function MarkInput({ m, row, rubric, label, onSave }: { m?: TeamMark; row?: Rubr
 }
 
 /**
- * Calificar por equipos: se forman los equipos de la actividad (al azar, por lista o copiando los de otra) y la nota
- * que se pone a cada equipo se copia a sus integrantes. Quien tenga una nota distinta (ajustada a mano) la conserva.
+ * Formar los equipos de una actividad: al azar o por orden de lista con un máximo de integrantes, o copiando los de
+ * otra actividad. Después se puede mover a cada alumno, renombrar y añadir equipos.
+ */
+export function TeamBuilder(p: { teams: Team[]; students: Student[]; others: Activity[]; onChange: (t: Team[], label?: string) => void; onMsg?: (m: string) => void }) {
+  const { teams, students } = p;
+  const [size, setSize] = useState(4);
+  const live = new Set(students.map((s) => s.id));
+  const byId = new Map(students.map((s) => [s.id, s]));
+  const inTeam = new Set(teams.flatMap((t) => t.studentIds));
+  const loose = students.filter((s) => !inTeam.has(s.id));
+  const others = p.others.filter((a) => a.teams?.length);
+  const set = p.onChange;
+
+  function build(random: boolean) {
+    if (teams.some((t) => t.studentIds.length) && !confirm('¿Rehacer los equipos? Las notas ya puestas a cada alumno se quedan como están.')) return;
+    set(makeTeams(students.map((s) => s.id), size, uid, random ? Math.random : undefined), 'formar equipos');
+    p.onMsg?.(`Equipos de ${size} como mucho, ${random ? 'al azar' : 'por orden de lista'}.`);
+  }
+  function copyFrom(id: string) {
+    const src = p.others.find((a) => a.id === id);
+    if (!src?.teams || (teams.length && !confirm(`¿Sustituir los equipos por los de «${src.title}»?`))) return;
+    set(copyTeams(src.teams, students.map((s) => s.id), uid), 'copiar equipos');
+    p.onMsg?.(`Equipos copiados de «${src.title}».`);
+  }
+
+  if (!students.length) return <p className="mute">El grupo aún no tiene alumnos.</p>;
+  return (
+    <>
+      <div className="row">
+        <label className="row" style={{ margin: 0 }}>Integrantes
+          <select aria-label="Integrantes por equipo" value={size} onChange={(e) => setSize(Number(e.target.value))}>
+            {[2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <button className="small" onClick={() => build(true)}>Al azar</button>
+        <button className="small" onClick={() => build(false)}>Por lista</button>
+        {others.length > 0 && (
+          <select aria-label="Copiar equipos de otra actividad" value="" onChange={(e) => copyFrom(e.target.value)}>
+            <option value="">Copiar de…</option>
+            {others.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+          </select>
+        )}
+      </div>
+      {teams.length > 0 && (
+        <div className="teamgrid">
+          {teams.map((t) => (
+            <div className="teamedit" key={t.id}>
+              <div className="sp">
+                <input aria-label="Nombre del equipo" defaultValue={t.name} key={t.name} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && set(teams.map((x) => (x.id === t.id ? { ...x, name: e.target.value.trim() } : x)))} />
+                {!t.studentIds.some((s) => live.has(s)) && <button className="small" onClick={() => set(teams.filter((x) => x.id !== t.id), 'quitar equipo')}>Quitar</button>}
+              </div>
+              {t.studentIds.filter((s) => live.has(s)).map((sid) => (
+                <div className="sp member" key={sid}>
+                  <span>{short(byId.get(sid)!)}</span>
+                  <select aria-label={`Equipo de ${short(byId.get(sid)!)}`} value={t.id} onChange={(e) => set(moveStudent(teams, sid, e.target.value))}>
+                    {teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    <option value="">Sin equipo</option>
+                  </select>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+      {teams.length > 0 && loose.length > 0 && (
+        <div className="teamedit">
+          <b>Sin equipo</b>
+          {loose.map((s) => (
+            <div className="sp member" key={s.id}>
+              <span>{short(s)}</span>
+              <select aria-label={`Equipo de ${short(s)}`} value="" onChange={(e) => set(moveStudent(teams, s.id, e.target.value))}>
+                <option value="">Sin equipo</option>
+                {teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+      )}
+      {teams.length > 0 && <div className="row"><button className="small" onClick={() => set([...teams, { id: uid(), name: `Equipo ${teams.length + 1}`, studentIds: [] }])}>Añadir equipo</button></div>}
+    </>
+  );
+}
+
+/**
+ * Calificar por equipos (se forman en Planificar, al editar la actividad): la nota que se pone a cada equipo se copia a sus integrantes. Quien tenga una nota distinta (ajustada a mano) la conserva.
  */
 export function Teams(p: {
   act: Activity; acts: Activity[]; students: Student[]; items: CNode[]; rubric?: Rubric; sgOf: (s: Student) => StudentGrades;
@@ -33,26 +116,9 @@ export function Teams(p: {
 }) {
   const { act, students, items, rubric, sgOf } = p;
   const teams = act.teams ?? [];
-  const [size, setSize] = useState(4);
-  const [edit, setEdit] = useState(!teams.length);
+  const [edit, setEdit] = useState(false);
   const live = new Set(students.map((s) => s.id));
   const byId = new Map(students.map((s) => [s.id, s]));
-  const inTeam = new Set(teams.flatMap((t) => t.studentIds));
-  const loose = students.filter((s) => !inTeam.has(s.id));
-  const others = p.acts.filter((a) => a.id !== act.id && a.teams?.length);
-  const set = (t: Team[], label?: string) => saveTeams(act, t, label);
-
-  async function build(random: boolean) {
-    if (teams.length && !confirm('¿Rehacer los equipos? Las notas ya puestas a cada alumno se quedan como están.')) return;
-    await set(makeTeams(students.map((s) => s.id), size, uid, random ? Math.random : undefined), 'formar equipos');
-    p.onMsg(`Equipos de ${size} como mucho, ${random ? 'al azar' : 'por orden de lista'}.`);
-  }
-  async function copyFrom(id: string) {
-    const src = p.acts.find((a) => a.id === id);
-    if (!src?.teams || (teams.length && !confirm(`¿Sustituir los equipos por los de «${src.title}»?`))) return;
-    await set(copyTeams(src.teams, students.map((s) => s.id), uid), 'copiar equipos');
-    p.onMsg(`Equipos copiados de «${src.title}».`);
-  }
   const markOf = (t: Team, n?: CNode) => (n ? t.items?.[n.id] : t.mark);
   const gradeOf = (s: Student, n?: CNode) => { const sg = sgOf(s); return n ? sg.byItem.get(act.id)?.get(n.id) : sg.byActivity.get(act.id); };
   const isAdjusted = (t: Team, s: Student) => (items.length ? items.some((n) => adjusted(gradeOf(s, n), markOf(t, n))) : adjusted(gradeOf(s), t.mark));
@@ -69,72 +135,23 @@ export function Teams(p: {
     p.onMsg(`${s.firstName} tiene otra vez la nota del equipo.`);
   }
 
-  if (act.formative) return <p className="mute">Actividad sin calificación: los equipos solo sirven para organizar. Puedes formarlos igualmente.</p>;
 
   return (
     <div className="teams">
-      <details className="card sect" open={edit} onToggle={(e) => setEdit((e.target as HTMLDetailsElement).open)}>
-        <summary>{teams.length ? `Equipos (${teams.length})` : 'Formar equipos'}</summary>
-        <div className="row">
-          <label className="row" style={{ margin: 0 }}>Integrantes
-            <select aria-label="Integrantes por equipo" value={size} onChange={(e) => setSize(Number(e.target.value))}>
-              {[2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-          <button className="small" onClick={() => build(true)}>Al azar</button>
-          <button className="small" onClick={() => build(false)}>Por lista</button>
-          {others.length > 0 && (
-            <select aria-label="Copiar equipos de otra actividad" value="" onChange={(e) => copyFrom(e.target.value)}>
-              <option value="">Copiar de…</option>
-              {others.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
-            </select>
-          )}
-        </div>
-        {teams.length > 0 && (
-          <div className="teamgrid">
-            {teams.map((t) => (
-              <div className="teamedit" key={t.id}>
-                <div className="sp">
-                  <input aria-label="Nombre del equipo" defaultValue={t.name} key={t.name} onBlur={(e) => e.target.value.trim() && e.target.value !== t.name && set(teams.map((x) => (x.id === t.id ? { ...x, name: e.target.value.trim() } : x)))} />
-                  {!t.studentIds.some((s) => live.has(s)) && <button className="small" onClick={() => set(teams.filter((x) => x.id !== t.id), 'quitar equipo')}>Quitar</button>}
-                </div>
-                {t.studentIds.filter((s) => live.has(s)).map((sid) => (
-                  <div className="sp member" key={sid}>
-                    <span>{short(byId.get(sid)!)}</span>
-                    <select aria-label={`Equipo de ${short(byId.get(sid)!)}`} value={t.id} onChange={(e) => set(moveStudent(teams, sid, e.target.value))}>
-                      {teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                      <option value="">Sin equipo</option>
-                    </select>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        )}
-        {teams.length > 0 && loose.length > 0 && (
-          <div className="teamedit">
-            <b>Sin equipo</b>
-            {loose.map((s) => (
-              <div className="sp member" key={s.id}>
-                <span>{short(s)}</span>
-                <select aria-label={`Equipo de ${short(s)}`} value="" onChange={(e) => set(moveStudent(teams, s.id, e.target.value))}>
-                  <option value="">Sin equipo</option>
-                  {teams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
-        {teams.length > 0 && <div className="row"><button className="small" onClick={() => set([...teams, { id: uid(), name: `Equipo ${teams.length + 1}`, studentIds: [] }])}>Añadir equipo</button></div>}
-        <p className="mute">Los equipos son de esta actividad. Para usarlos en otra, cópialos desde ella.</p>
-      </details>
+      {!teams.length && <p className="card mute">Esta actividad no se hace en equipos. Actívalo en Planificar, al editar la actividad («Trabajo en equipos»).</p>}
+      {teams.length > 0 && (
+        <details className="card sect" open={edit} onToggle={(e) => setEdit((e.target as HTMLDetailsElement).open)}>
+          <summary>Cambiar equipos ({teams.length})</summary>
+          <TeamBuilder teams={teams} students={students} others={p.acts.filter((a) => a.id !== act.id)} onChange={(t, label) => saveTeams(act, t, label)} onMsg={p.onMsg} />
+        </details>
+      )}
 
       {teams.filter((t) => t.studentIds.some((s) => live.has(s))).map((t) => {
         const members = t.studentIds.map((s) => byId.get(s)).filter((s): s is Student => !!s);
         return (
           <section className="card teamcard" key={t.id}>
             <div className="sp"><b>{t.name}</b><span className="mute">{members.length} integrantes</span></div>
-            {items.length ? items.map((n) => (
+            {act.formative ? null : items.length ? items.map((n) => (
               <div className="crit" key={n.id}>
                 <span className="ink2"><b className="code">{n.code}</b> {n.title.length > 90 ? n.title.slice(0, 90) + '…' : n.title}</span>
                 <MarkInput key={t.id + n.id + JSON.stringify(t.items?.[n.id] ?? null)} m={t.items?.[n.id]} row={rubric?.rows.find((r) => r.nodeId === n.id)} rubric={rubric} label={`${t.name} · ${n.code}`}

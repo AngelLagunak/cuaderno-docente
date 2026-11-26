@@ -7,6 +7,7 @@ import { NodePicker } from './NodePicker';
 import { Rubrics } from './Rubrics';
 import { Calendar } from './Calendar';
 import { Overview } from './Overview';
+import { TeamBuilder } from './Teams';
 import { RubricMap } from './ClassroomPanel';
 import { describe } from '../data/classroomSync';
 import { AdaptBadge } from './Groups';
@@ -122,8 +123,11 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; links: CLink[]; assessab
   const twin = (gid: string) => isNew ? undefined : matchWork(a.title, p.all.filter((x) => x.groupId === gid && !x.deleted && (!a.shareId || x.shareId !== a.shareId)));
   const [join, setJoin] = useState<string[]>([]);
   // Alumnado con adaptación curricular del grupo: nota de la actividad para cada uno.
-  const adapted = (useLiveQuery(() => (p.group ? db.students.where('groupId').equals(p.group.id).toArray() : []), [p.group?.id]) ?? [])
-    .filter((s) => !s.deleted && s.adaptation).sort((x, y) => x.lastName.localeCompare(y.lastName, 'es'));
+  const groupStudents = (useLiveQuery(() => (p.group ? db.students.where('groupId').equals(p.group.id).toArray() : []), [p.group?.id]) ?? [])
+    .filter((s) => !s.deleted).sort((x, y) => (x.lastName + x.firstName).localeCompare(y.lastName + y.firstName, 'es'));
+  const adapted = groupStudents.filter((s) => s.adaptation);
+  const [teamMsg, setTeamMsg] = useState('');
+  const [inTeams, setInTeams] = useState(!!p.init.teams?.length);
   const setAdapt = (sid: string, text: string) => {
     const next = { ...a.adaptations };
     if (text.trim()) next[sid] = text; else delete next[sid];
@@ -179,6 +183,17 @@ function ActForm(p: { subject: Subject; nodes: CNode[]; links: CLink[]; assessab
           ))}
         </details>
       )}
+      <details className="groupsBox" open={inTeams}>
+        <summary><b>Trabajo en equipos{a.teams?.length ? ` (${a.teams.length})` : ''}</b></summary>
+        <label><input type="checkbox" checked={inTeams} onChange={(e) => {
+          if (!e.target.checked && a.teams?.length && !confirm('¿Quitar los equipos de esta actividad? Las notas ya puestas a cada alumno se quedan.')) return;
+          setInTeams(e.target.checked);
+          if (!e.target.checked) setA({ ...a, teams: undefined });
+        }} /> Se hace en equipos: en el Cuaderno se pone la nota a cada equipo y llega a sus integrantes (se puede ajustar la de cada uno)</label>
+        {inTeams && <TeamBuilder teams={a.teams ?? []} students={groupStudents} others={p.others.filter((x) => x.id !== a.id)} onChange={(t) => setA((cur) => ({ ...cur, teams: t.length ? t : undefined }))} onMsg={setTeamMsg} />}
+        {inTeams && teamMsg && <p className="mute">{teamMsg}</p>}
+        {inTeams && otherGroups.length > 0 && <p className="mute">Los equipos son de {p.group?.name}. En los demás grupos se forman al editar su actividad.</p>}
+      </details>
       {otherGroups.length > 0 && (
         <div className="groupsBox">
           <b>Grupos que hacen esta actividad</b>
